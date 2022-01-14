@@ -4,6 +4,7 @@ import glob
 from pathlib import Path
 import numpy as np
 from utils import is_empty, create_dir_if_nonexist
+from features import clean_text_label
 
 print('Extracting training data from HSCPC concordances')
 
@@ -25,7 +26,7 @@ for f in conc_files:
     print('.')
     print('Extracting ' + fname)
 
-    if '.xlsx' in fname and '~$' not in fname: 
+    if '.xlsx' in fname and '~$' not in fname:
 
         # Read the concordance file
         df = pd.read_excel(f)
@@ -54,7 +55,10 @@ for f in conc_files:
         for i, r in enumerate(conc_ar):
 
             row_label = str(source_labels[i][0])
-            assert np.min(r) >= 0 and np.max(r) <= 1, 'Non-binary values found on line: ' + str(i) + ', label: ' + row_label
+            row_label = clean_text_label(row_label)
+
+            assert np.min(r) >= 0 and np.max(r) <= 1, ('Non-binary values found on line: ' + str(i) +
+                                                       ', label: ' + row_label)
 
             if np.sum(r) > 0:
 
@@ -62,8 +66,10 @@ for f in conc_files:
                 nnzs = np.where(r > 0)[0]
                 assert not is_empty(nnzs)
 
+                #hscpc_labels = ','.join(nnzs.astype(str))
+                hscpc_labels = nnzs
+
                 # Store
-                hscpc_labels = ','.join(nnzs.astype(str))
                 tmp_store.append({'conc': fname, 'source_row_label': row_label, 'hscpc_labels': hscpc_labels,
                                   'position': (i+1)/n_source, 'row_weight': np.sum(r)/np.sum(conc_ar)})
 
@@ -71,13 +77,15 @@ for f in conc_files:
 
         print('Added ' + str(len(tmp_store)) + ' rows')
 
+print('.')
 print('Feature store contains: ' + str(len(feature_store)) + ' rows in total')
 
 # Save
 save_path = work_dir + '/training_data/'
 create_dir_if_nonexist(save_path)
 
-fname = save_path + 'hscpc_collected_training_set.xlsx'
-pd.DataFrame(feature_store).to_excel(fname)
+fname = save_path + 'hscpc_collected_training_set.pkl'
+feature_fd = pd.DataFrame(feature_store)
+feature_fd.to_pickle(fname)
 
 print('Finished')
