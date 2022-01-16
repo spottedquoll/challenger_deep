@@ -3,7 +3,7 @@ import os
 import glob
 from pathlib import Path
 from utils import create_dir_if_nonexist
-from features import clean_text_label
+from feature_engineering import clean_text_label, dictionary_supplement
 
 
 print('Creating source label vocab')
@@ -62,8 +62,14 @@ for f in conc_files:
             tmp_store.extend(lbl)
 
         dictionary.extend(tmp_store)
-
 print('.')
+
+print('Extracted dictionary length: ' + str(len(dictionary)))
+
+# Supplement dictionary
+dictionary.extend(dictionary_supplement())
+
+print('Post supplemented length: ' + str(len(dictionary)))
 
 # Delete duplicates
 len_prior = len(dictionary)
@@ -80,4 +86,5 @@ fname = save_path + 'label_dictionary.pkl'
 label_store = pd.DataFrame(dictionary, columns=['source_labels'])
 label_store.to_pickle(fname)
 
+print('.')
 print('Finished')

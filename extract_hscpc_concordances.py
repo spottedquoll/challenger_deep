@@ -4,7 +4,7 @@ import glob
 from pathlib import Path
 import numpy as np
 from utils import is_empty, create_dir_if_nonexist
-from features import clean_text_label
+from feature_engineering import clean_text_label
 
 print('Extracting training data from HSCPC concordances')
 
@@ -12,9 +12,12 @@ print('Extracting training data from HSCPC concordances')
 n_root = 6357
 empty_col_name = 'Unnamed: 0'
 
-# use glob to get all the csv files in the folder
+# Paths
 work_dir = os.environ['work_dir'] + '/'
-conc_files = glob.glob(os.path.join(work_dir + 'training_concs_hscpc/', "*.xlsx"))
+training_data_dir = work_dir + 'training_concs_hscpc/'
+
+# Discover all the training concs in the folder
+conc_files = glob.glob(os.path.join(training_data_dir, "*.xlsx"))
 
 feature_store = []
 
@@ -60,18 +63,16 @@ for f in conc_files:
             assert np.min(r) >= 0 and np.max(r) <= 1, ('Non-binary values found on line: ' + str(i) +
                                                        ', label: ' + row_label)
 
+            # Find indices of HSCPC labels
             if np.sum(r) > 0:
 
-                # Find HSCPC labels
                 nnzs = np.where(r > 0)[0]
                 assert not is_empty(nnzs)
 
-                #hscpc_labels = ','.join(nnzs.astype(str))
                 hscpc_labels = nnzs
 
                 # Store
-                tmp_store.append({'conc': fname, 'source_row_label': row_label, 'hscpc_labels': hscpc_labels,
-                                  'position': (i+1)/n_source, 'row_weight': np.sum(r)/np.sum(conc_ar)})
+                tmp_store.append({'conc': fname, 'source_row_label': row_label, 'hscpc_labels': hscpc_labels})
 
         feature_store.extend(tmp_store)
 
