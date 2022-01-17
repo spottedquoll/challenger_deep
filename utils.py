@@ -5,6 +5,11 @@ from collections.abc import Sequence
 import pickle
 
 
+def duplicates_in_list(lst):
+
+    return len(lst) != len(set(lst))
+
+
 def write_pickle(fname, obj_to_write):
 
     with open(fname, 'wb') as f:
