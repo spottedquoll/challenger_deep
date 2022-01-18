@@ -36,7 +36,7 @@ print('Extracted ' + str(len(x_labels)) + ' source labels')
 assert not duplicates_in_list(x_labels)
 
 # Load HSCPC labels
-df = pd.read_excel(work_dir + 'hscpc_labels.xlsx', header=0)
+df = pd.read_excel(work_dir + 'hscpc/hscpc_labels.xlsx', header=0)
 target_labels = df['Labels'].values
 
 assert not duplicates_in_list(x_labels)
@@ -68,32 +68,60 @@ preds = model.predict(x_features_encoded)
 conc_estimated = pd.DataFrame(preds, index=x_labels, columns=target_labels)
 conc_estimated.to_excel(prediction_dir + 'challenger_deep_predict_' + source_name + '_raw' + '.xlsx')
 
-# Save estimates, filtered by decision boundary
-est = preds.copy()
-est[est >= decision_boundary] = 1
-est[est < decision_boundary] = 0
+# # Save estimates, filtered by decision boundary
+# est = preds.copy()
+# est[est >= decision_boundary] = 1
+# est[est < decision_boundary] = 0
+#
+# conc_filtered = pd.DataFrame(est, index=x_labels, columns=target_labels, dtype=int)
+# conc_filtered.to_excel(prediction_dir + 'challenger_deep_predict_' + source_name + '_conc_decision_'
+#                        + str(decision_boundary) + '.xlsx')
 
-conc_filtered = pd.DataFrame(est, index=x_labels, columns=target_labels, dtype=int)
-conc_filtered.to_excel(prediction_dir + 'challenger_deep_predict_' + source_name + '_conc_decision_'
-                       + str(decision_boundary) + '.xlsx')
-
-# Set binary values based on th maximum probability in each row and column
+# Set binary values based on the maximum probability in each row
 conc_max_prob = pd.DataFrame(0, columns=conc_estimated.columns, index=conc_estimated.index, dtype=int)
+conc_estimated_tr = conc_estimated.transpose()
 
-# Maximum probability in each column
-for c in conc_estimated.columns:
-    idx_max = conc_estimated[c].idxmax()
-    if not isinstance(idx_max, str):
-        idx_max = idx_max[0]
-    conc_max_prob.at[idx_max, c] = 1
-
-# If first pass did left rows unset, set column link using max row probability
-row_max_idxs = conc_estimated.idxmax(axis="columns")
+# Highest match for each source label
 for row_index, row in conc_max_prob.iterrows():
-    if row.sum() == 0:
-        col_index = row_max_idxs[row_index]
-        conc_max_prob.at[row_index, col_index] = 1
 
-conc_max_prob.to_excel(prediction_dir + 'challenger_deep_predict_' + source_name + '_conc_max_probability'
-                       + '.xlsx')
+    # HSCPC probabilties in top quantile
+    top_ranked_matches = conc_estimated_tr[row_index].quantile(0.998)
 
+    filter_matches = conc_estimated_tr[conc_estimated_tr[row_index] >= top_ranked_matches][row_index]
+    assert not filter_matches.empty
+
+    # Column indices
+    col_idxs_hscpc = filter_matches.index.to_list()
+    assert not duplicates_in_list(col_idxs_hscpc)
+
+    # Set value
+    conc_max_prob.loc[row_index, col_idxs_hscpc] = 1
+
+# Check columns for unallocated
+for c in conc_max_prob.columns:
+    if conc_max_prob[c].sum() == 0:
+        idx_max = conc_estimated[c].idxmax()
+        if not isinstance(idx_max, str):
+            idx_max = idx_max[0]
+        conc_max_prob.at[idx_max, c] = 1
+
+conc_max_prob.to_excel(prediction_dir + 'challenger_deep_predict_' + source_name + '_conc_max_prob' + '.xlsx')
+
+# # Maximum probability in each column
+# for c in conc_estimated.columns:
+#     idx_max = conc_estimated[c].idxmax()
+#     if not isinstance(idx_max, str):
+#         idx_max = idx_max[0]
+#     conc_max_prob.at[idx_max, c] = 1
+#
+# # If first pass did left rows unset, set column link using max row probability
+# row_max_idxs = conc_estimated.idxmax(axis="columns")
+# for row_index, row in conc_max_prob.iterrows():
+#     if row.sum() == 0:
+#         col_index = row_max_idxs[row_index]
+#         conc_max_prob.at[row_index, col_index] = 1
+
+# conc_max_prob.to_excel(prediction_dir + 'challenger_deep_predict_' + source_name + '_conc_max_probability'
+#                        + '.xlsx')
+
+print('Finished')
