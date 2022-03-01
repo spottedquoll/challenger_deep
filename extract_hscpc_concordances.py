@@ -49,6 +49,7 @@ for f in conc_files:
         conc = df.set_index('labels')
 
         # Convert to array
+        assert not conc.isnull().values.any()
         conc_ar = conc.to_numpy(dtype=int, copy=True)  # what do NaNs get converted as?
 
         assert conc_ar.shape[0] == n_source

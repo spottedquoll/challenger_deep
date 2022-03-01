@@ -2,7 +2,6 @@ from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import (Dense, LeakyReLU, Dropout, GlobalMaxPooling1D, BatchNormalization, Conv1D)
 from tensorflow.keras.optimizers import Adam, SGD, RMSprop
-from learning import plot_history
 import pandas as pd
 import numpy as np
 import os
