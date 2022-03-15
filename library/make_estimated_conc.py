@@ -33,22 +33,30 @@ def conc_flood_fill_com(conc_estimated, threshold=0.95):
         # Select values larger than the threshold
         c_top_prob = conc_estimated_tr.loc[conc_estimated_tr[c] > tmp_threshold][[c, 'index_int']]
         count_matches = c_top_prob.shape[0]
-        assert count_matches > 0
+        if count_matches == 0:
+            stop=1
+        assert count_matches > 0, 'No predictions for source label: ' + c
 
         probs = c_top_prob[c].values.reshape(-1, 1)
         idxs = c_top_prob['index_int'].values.reshape(-1, 1)
         com = np.average(idxs, axis=0, weights=probs**3)
         positions.append(int(com))
 
-    # Flood fill
+    # Initialise at the com points
     conc_ar = np.zeros(conc_estimated.shape, dtype=int)
     conc_est_ar = conc_estimated.to_numpy()
-    conc_rel_imp = conc_est_ar / conc_est_ar.sum(axis=1).reshape(-1,1)  # relative importances
+    conc_rel_imp = conc_est_ar / conc_est_ar.sum(axis=1).reshape(-1, 1)  # relative importances
 
     for i, j in enumerate(positions):
-        assert sum(conc_ar[i, :]) == 0
-        conc_ar[i, j] = 1
+        if sum(conc_ar[:, j]) == 0:
+            conc_ar[i, j] = 1
+        elif sum(conc_ar[:, j+1]) == 0:
+            conc_ar[i, j+1] = 1
+        elif sum(conc_ar[:, j - 1]) == 0:
+            conc_ar[i, j - 1] = 1
+    assert all(np.sum(conc_ar, axis=0) <= 1), 'Source matches are not unique!'
 
+    # Flood fill
     k = 1
     hard_max_iter = 15000
     max_iter = 4000
@@ -76,8 +84,10 @@ def conc_flood_fill_com(conc_estimated, threshold=0.95):
                     elif conc_rel_imp[i, next_idx] * (1+(0.8*k/max_iter)) > max(conc_rel_imp[:, next_idx]):
                         conc_ar[i, next_idx] = 1
                     elif np.sum(conc_ar[i, 0:next_idx], axis=0) == 0:  # lower edge
+                        assert sum(conc_ar[:, next_idx]) == 0
                         conc_ar[i, next_idx] = 1
                     elif np.sum(conc_ar[i, next_idx:], axis=0) == 0:  # upper edge
+                        assert sum(conc_ar[:, next_idx]) == 0
                         conc_ar[i, next_idx] = 1
 
         k = k + 1
@@ -88,7 +98,9 @@ def conc_flood_fill_com(conc_estimated, threshold=0.95):
             print('k: ' + str(k) + ', fill: ' + str(round(completeness)) + '% complete')
 
     # Tests
-    assert all(np.sum(conc_ar, axis=0) <= 1)  # Source matches are unique
+    if not all(np.sum(conc_ar, axis=0) <= 1):
+        stop=1
+    assert all(np.sum(conc_ar, axis=0) <= 1), 'Source matches are not unique!'
 
     # Convert to dataframe
     conc_com = pd.DataFrame(conc_ar, columns=conc_estimated.columns, index=conc_estimated.index, dtype=int)

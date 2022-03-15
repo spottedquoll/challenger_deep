@@ -2,15 +2,15 @@ import os
 from utils import read_pickle
 import numpy as np
 import pandas as pd
-from feature_engineering import encode_source_labels, clean_text_label, create_position_feature
+from library.feature_engineering import encode_source_labels, clean_text_label, create_position_feature
 from utils import duplicates_in_list
-from make_estimated_conc import maximum_match_probability, conc_from_clusters, conc_flood_fill_com, conc_from_decision_boundary
+from library.make_estimated_conc import maximum_match_probability, conc_flood_fill_com, conc_from_decision_boundary
 
 # Switches
-model_version = 'model_2022-02-25_w3075_s4318'  # 'model_2022-01-15_w2882_s3714'
-feature_meta_version = 'feature_meta_2022-02-25_w3075'  # 'feature_meta_2022-01-16_w2882'
-target_label_file = 'USA_BEA_15_labels'
-decision_boundary = 0.8
+model_version = 'model_2022-03-15_w3107_s4924'
+feature_meta_version = 'feature_meta_2022-03-15_w3107'
+target_label_file = 'MEX_labels_259'
+decision_boundary = 0.85
 
 print('Predicting ' + target_label_file + ' HSCPC matches')
 
@@ -73,11 +73,11 @@ conc_raw_estimates = pd.DataFrame(preds, index=x_labels, columns=target_labels)
 conc_raw_estimates.to_excel(fname_prefix + '_raw' + '.xlsx')
 
 # Save estimates, filtered by decision boundary
-conc_filtered = conc_from_decision_boundary(conc_raw_estimates.copy(), decision_boundary=0.7)
+conc_filtered = conc_from_decision_boundary(conc_raw_estimates.copy(), decision_boundary=decision_boundary)
 conc_filtered.to_excel(fname_prefix + '_conc_thresholded_' + str(decision_boundary) + '.xlsx')
 
 # Center of mass
-conc_com = conc_flood_fill_com(conc_raw_estimates)
+conc_com = conc_flood_fill_com(conc_raw_estimates.copy())
 conc_com.to_excel(fname_prefix + '_conc_flood_fill_com' + '.xlsx')
 
 # Set binary values based on the maximum probability in each row
@@ -85,4 +85,4 @@ conc_max_prob = maximum_match_probability(conc_raw_estimates.copy())
 conc_max_prob.to_excel(fname_prefix + '_conc_max_prob' + '.xlsx')
 
 
-print('Finished')
+print('Finished writing predictons to ' + prediction_dir)

@@ -1,5 +1,4 @@
 import string
-import random
 import numpy as np
 
 
@@ -41,27 +40,6 @@ def encode_source_labels(tokenizer, x_labels, max_words):
     return x_features_encoded
 
 
-def augment_by_union(x, y, position_feature, factor):
-
-    n_real_records = len(x)
-    extra_rows = int(n_real_records*factor)
-
-    for i in range(extra_rows):
-
-        rand_idx = random.randint(0, n_real_records-2)
-        new_x_label = x[rand_idx] + ' ' + x[rand_idx+1]
-        new_y_label = np.unique(np.concatenate((y[rand_idx], y[rand_idx+1])))
-        new_position = np.mean([position_feature[rand_idx][2], position_feature[rand_idx+1][2]])
-
-        x.append(new_x_label)
-        y.append(new_y_label)
-        position_feature.append([position_feature[rand_idx][0], position_feature[rand_idx][1], new_position])
-
-    print('Training x augmented from ' + str(n_real_records) + ' to ' + str(len(x)) + ' records')
-
-    return x, y, position_feature
-
-
 def clean_text_label(txt):
 
     # Remove punctuation and make lower case
@@ -82,7 +60,8 @@ def clean_text_label(txt):
 def dictionary_supplement():
 
     d = ['millwork', 'breweries', 'brewery', 'wineries', 'distilleries', 'retailers', 'owner', 'occupied', 'housing',
-         'cocoyams']
+         'cocoyams', 'tenant', 'fisher']
 
     return d
+
 
