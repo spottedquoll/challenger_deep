@@ -68,6 +68,7 @@ def conc_flood_fill_com(conc_estimated, threshold=0.95):
 
             # Indices already set in this row
             matches = np.nonzero(row)
+            assert matches is not None
 
             # Choose direction in which to move
             move = [min(matches[0]) - 1, max(matches[0]) + 1]
@@ -98,8 +99,6 @@ def conc_flood_fill_com(conc_estimated, threshold=0.95):
             print('k: ' + str(k) + ', fill: ' + str(round(completeness)) + '% complete')
 
     # Tests
-    if not all(np.sum(conc_ar, axis=0) <= 1):
-        stop=1
     assert all(np.sum(conc_ar, axis=0) <= 1), 'Source matches are not unique!'
 
     # Convert to dataframe
@@ -208,3 +207,88 @@ def conc_from_decision_boundary(conc_estimated, decision_boundary=0.95):
 
     return conc_estimated
 
+
+def conc_flood_fill_max_prob(conc_estimated, threshold=0.95):
+    """
+        Flood fills from center of mass
+    """
+
+    conc_est_tr = conc_estimated.transpose().reset_index()
+    conc_est_tr['index_int'] = conc_est_tr.index
+    original_cols = conc_estimated.index.to_list()
+
+    conc_ar = np.zeros(conc_estimated.shape, dtype=int)
+
+    # Find highest probability each source category
+    positions = []
+    for i, c in enumerate(original_cols):
+
+        probs_sorted = np.sort(conc_est_tr[c].values)[::-1]
+        filled = False
+        k = 0
+        previous_prob = 1
+
+        while not filled and k <= 10:
+
+            prob = probs_sorted[k]
+            c_top_prob = conc_est_tr.loc[(conc_est_tr[c] >= prob) & (conc_est_tr[c] < previous_prob)][[c, 'index_int']]
+
+            j = c_top_prob['index_int'].values[0]
+            if sum(conc_ar[:, j]) == 0:
+                conc_ar[i, j] = 1
+                filled = True
+
+            k = k + 1
+            previous_prob = prob
+
+    # Flood fill
+    conc_est_ar = conc_estimated.to_numpy()
+    conc_rel_imp = conc_est_ar / conc_est_ar.sum(axis=1).reshape(-1, 1)  # relative importances
+
+    k = 1
+    hard_max_iter = 15000
+    max_iter = 4000
+    n_columns = conc_estimated.shape[1]
+
+    while sum(sum(conc_ar)) < n_columns and k <= hard_max_iter:
+
+        for i, row in enumerate(conc_ar):
+
+            # Indices already set in this row
+            matches = np.nonzero(row)
+
+            # Choose direction in which to move
+            move = [min(matches[0]) - 1, max(matches[0]) + 1]
+            possible_moves = [x for x in move if 0 <= x <= n_columns-1]  # not reached edge
+
+            if possible_moves is not None and possible_moves != []:
+                next_idx = random.choice(possible_moves)
+                if sum(conc_ar[:, next_idx]) == 0:  # column has no entries in other rows
+                    prob_new = conc_est_ar[i, next_idx]
+                    if prob_new >= min(min(conc_est_ar[i, matches])):
+                        conc_ar[i, next_idx] = 1
+                    elif prob_new * (1+(k/max_iter)) >= np.quantile(conc_est_ar[i, :], 0.98):
+                        conc_ar[i, next_idx] = 1
+                    elif conc_rel_imp[i, next_idx] * (1+(0.8*k/max_iter)) > max(conc_rel_imp[:, next_idx]):
+                        conc_ar[i, next_idx] = 1
+                    elif np.sum(conc_ar[i, 0:next_idx], axis=0) == 0:  # lower edge
+                        assert sum(conc_ar[:, next_idx]) == 0
+                        conc_ar[i, next_idx] = 1
+                    elif np.sum(conc_ar[i, next_idx:], axis=0) == 0:  # upper edge
+                        assert sum(conc_ar[:, next_idx]) == 0
+                        conc_ar[i, next_idx] = 1
+
+        k = k + 1
+
+        # Log progress
+        if k % 100 == 0:
+            completeness = sum(conc_ar.reshape(-1))/n_columns * 100
+            print('k: ' + str(k) + ', fill: ' + str(round(completeness)) + '% complete')
+
+    # Tests
+    assert all(np.sum(conc_ar, axis=0) <= 1), 'Source matches are not unique!'
+
+    # Convert to dataframe
+    conc_com = pd.DataFrame(conc_ar, columns=conc_estimated.columns, index=conc_estimated.index, dtype=int)
+
+    return conc_com

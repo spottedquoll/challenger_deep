@@ -65,13 +65,16 @@ def extract_concordances(training_data_path, save_path):
                 # Find indices of HSCPC labels
                 if np.sum(r) > 0:
 
+                    # Indices of non-zero elements
                     nnzs = np.where(r > 0)[0]
                     assert not is_empty(nnzs)
-
                     hscpc_labels = nnzs
 
+                    # Position feature
+                    position = (i+1)/conc_ar.shape[0]
+
                     # Store
-                    tmp_store.append({'conc': fname, 'source_row_label': row_label, 'hscpc_labels': hscpc_labels})
+                    tmp_store.append({'conc': fname, 'source_row_label': row_label, 'hscpc_labels': hscpc_labels, 'position': position})
 
             feature_store.extend(tmp_store)
 
@@ -163,3 +166,5 @@ def create_source_label_vocabularly(raw_data_dir, training_data_dir, n_root):
     label_store.to_pickle(fname)
 
     print('Finished building vocabularly')
+
+

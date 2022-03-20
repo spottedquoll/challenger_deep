@@ -2,13 +2,14 @@ import os
 from utils import read_pickle
 import numpy as np
 import pandas as pd
-from library.feature_engineering import encode_source_labels, clean_text_label, create_position_feature
+from library.feature_engineering import encode_source_labels, clean_text_label, create_position_feature, make_c100_features
 from utils import duplicates_in_list
-from library.make_estimated_conc import maximum_match_probability, conc_flood_fill_com, conc_from_decision_boundary
+from library.make_estimated_conc import (maximum_match_probability, conc_flood_fill_com, conc_from_decision_boundary,
+                                         conc_flood_fill_max_prob)
 
 # Switches
-model_version = 'model_2022-03-15_w3107_s4924'
-feature_meta_version = 'feature_meta_2022-03-15_w3107'
+model_version = 'model_2022-03-20_w3107_s14399_l4'
+feature_meta_version = 'feature_meta_2022-03-20_w3107'
 target_label_file = 'MEX_labels_259'
 decision_boundary = 0.85
 
@@ -52,10 +53,21 @@ max_words = feature_meta['max_words']
 # One-hot-encode x labels
 x_features_encoded = encode_source_labels(tokenizer, x_labels, max_words)
 
-# Add position features
+# # Add position features
+# if feature_meta['add_position_features']:
+#     position_feature = create_position_feature(len(x_labels), n_root)
+#     x_features_encoded = np.append(x_features_encoded, np.array(position_feature), axis=1)
+
+# Add label position feature
 if feature_meta['add_position_features']:
-    position_feature = create_position_feature(len(x_labels), n_root)
-    x_features_encoded = np.append(x_features_encoded, np.array(position_feature), axis=1)
+    position_feature = create_position_feature(x_labels)
+    x_features_encoded = np.hstack((x_features_encoded, np.array(position_feature).reshape(-1, 1)))
+
+# C100 features
+if feature_meta['add_isic_100_features']:
+    c100_labels = pd.read_excel(work_dir + 'hscpc/c100_labels.xlsx')['sector'].to_list()
+    new_features = make_c100_features(x_labels, c100_labels)
+    x_features_encoded = np.hstack((x_features_encoded, new_features))
 
 # Load predictive model
 model_fname = model_dir + model_version + '.pkl'
@@ -83,6 +95,10 @@ conc_com.to_excel(fname_prefix + '_conc_flood_fill_com' + '.xlsx')
 # Set binary values based on the maximum probability in each row
 conc_max_prob = maximum_match_probability(conc_raw_estimates.copy())
 conc_max_prob.to_excel(fname_prefix + '_conc_max_prob' + '.xlsx')
+
+# Center of mass
+conc_com = conc_flood_fill_max_prob(conc_raw_estimates.copy())
+conc_com.to_excel(fname_prefix + '_conc_flood_fill_max_prob' + '.xlsx')
 
 
 print('Finished writing predictons to ' + prediction_dir)

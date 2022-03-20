@@ -25,7 +25,7 @@ def basic_dense(feature_dim, output_dim):
     model = Sequential()
     model.add(Dense(feature_dim, activation='relu', kernel_regularizer='l2', kernel_initializer='he_uniform'))
     model.add(BatchNormalization())
-    model.add(Dropout(0.5))
+    model.add(Dropout(0.1))
     model.add(Dense(output_dim, activation='sigmoid'))
 
     return model
@@ -37,8 +37,8 @@ def basic_dense_plus(feature_dim, output_dim):
     model.add(Dense(feature_dim, activation='relu', kernel_regularizer='l2', kernel_initializer='he_uniform'))
     model.add(BatchNormalization())
     model.add(Dropout(0.1))
-    model.add(Dense(output_dim, activation='relu', kernel_constraint=max_norm(2.)))
+    model.add(Dense(output_dim*1.5, activation='relu', kernel_constraint=max_norm(2.)))
     model.add(Dropout(0.1))
-    model.add(Dense(output_dim, activation='sigmoid'))
+    model.add(Dense(output_dim, activation='softmax'))
 
     return model

@@ -1,13 +1,14 @@
-from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping
 import pandas as pd
 import numpy as np
 import os
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
-from library.feature_engineering import encode_source_labels, create_position_feature
+from library.feature_engineering import encode_source_labels, create_tokenizer, make_c100_features
 from library.augmentation import augment_by_adjacent_union
 from datetime import date
-from utils import write_pickle, create_dir_if_nonexist
+from utils import write_pickle, create_dir_if_nonexist, read_pickle
 from library.training_toolkit import extract_concordances, create_source_label_vocabularly
 from library.model_configs import embedded_conv, basic_dense, basic_dense_plus
 
@@ -15,15 +16,21 @@ from library.model_configs import embedded_conv, basic_dense, basic_dense_plus
 print('Building predictive model')
 
 # Switches
+use_prepared_data = True
 extract_training_data = False
 rebuild_source_vocabularly = False
 augment_training = True
-augment_factor = 2.0
 add_position_features = True
+add_isic_100_features = True
+
+# Settings
+augment_factor = 3
+test_set_size = 0.1
+max_vocab_fraction = 0.99
 decision_boundary = 0.90
-n_epochs = 30
+n_epochs = 20
 n_batch_size = 600
-alpha = 0.00001  # learning rate
+alpha = 0.0001  # learning rate
 
 # Constants
 n_root = 6357
@@ -37,86 +44,88 @@ training_data_dir = work_dir + 'training_data/'
 
 create_dir_if_nonexist(training_data_dir)
 
-# Extract training data
-if extract_training_data:
-    extract_concordances(raw_data_dir, training_data_dir)
+fname_prepared_data = work_dir + 'training_data/' + 'prepared_data' + '.pkl'
+if use_prepared_data:
+    prepared_data = read_pickle(fname_prepared_data)
+    x = prepared_data['x']
+    y = prepared_data['y']
+    tokenizer = prepared_data['tokenizer']
+    max_words = prepared_data['max_words']
+else:
 
-# Construct the vocabulary from the source data
-if rebuild_source_vocabularly:
-    create_source_label_vocabularly(raw_data_dir, training_data_dir, n_root)
+    # Extract training data
+    if extract_training_data:
+        extract_concordances(raw_data_dir, training_data_dir)
 
-# Read the vocabularly
-source_label_vocab = pd.read_pickle(training_data_dir + 'label_dictionary.pkl')
+    # Construct the vocabulary from the source data
+    if rebuild_source_vocabularly:
+        create_source_label_vocabularly(raw_data_dir, training_data_dir, n_root)
 
-# Read and wrangle the training data
-training_data = pd.read_pickle(training_data_dir + 'hscpc_collected_training_set.pkl')
+    # Read the vocabularly
+    source_label_vocab = pd.read_pickle(training_data_dir + 'label_dictionary.pkl')
 
-x_labels = training_data['source_row_label'].to_list()
-y_labels = training_data['hscpc_labels'].to_list()
-n_samples = len(x_labels)
+    # Read and wrangle the training data
+    training_data = pd.read_pickle(training_data_dir + 'hscpc_collected_training_set.pkl')
 
-# Append extra positional features
-position_feature = create_position_feature(len(x_labels), n_root)
-
-# Tests; check input data
-max_hscpc_index = [max(s) for s in zip(*y_labels)]
-min_hscpc_index = [min(s) for s in zip(*y_labels)]
-assert max_hscpc_index[0] == n_root-1 and min_hscpc_index[0] == 0
-
-# Augment
-if augment_training:
-    x_labels, y_labels, position_feature = augment_by_adjacent_union(x_labels, y_labels, position_feature, augment_factor)
+    x_labels = training_data['source_row_label'].to_list()
+    y_labels = training_data['hscpc_labels'].to_list()
     n_samples = len(x_labels)
 
-# Create tokenizer, configured to only take into account the max_words
-source_vocab = source_label_vocab['source_labels'].to_list()
-max_words = int(0.99*len(source_vocab))
-tokenizer = Tokenizer(num_words=max_words, filters='!"#$%&()*+,-./:;<=>?@[\\]^_`{|}~\t\n', lower=True, split=' ')
-tokenizer.fit_on_texts(source_vocab)
+    # Tests; check input data
+    max_hscpc_index = [max(s) for s in zip(*y_labels)]
+    min_hscpc_index = [min(s) for s in zip(*y_labels)]
+    assert max_hscpc_index[0] == n_root-1 and min_hscpc_index[0] == 0
 
-print('Source vocab length: ' + str(len(source_vocab)) + ', max word setting: ' + str(max_words))
+    # One hot encode y
+    y = np.zeros((n_samples, n_root), dtype=int)
+    for i, j in enumerate(y_labels):
+        y[i, j] = 1
 
-feature_meta = {'tokenizer': tokenizer, 'max_words': max_words}
+    # Create tokenizer, configured to only take into account the max_words
+    source_vocab = source_label_vocab['source_labels'].to_list()
+    tokenizer, max_words = create_tokenizer(source_vocab, max_vocab_fraction)
 
-# One-hot-encode x labels
-x_features_encoded = encode_source_labels(tokenizer, x_labels, max_words)
+    # One-hot-encode x labels
+    x_features_encoded = encode_source_labels(tokenizer, x_labels, max_words)
 
-# Add extra features
-if add_position_features:
-    x_features_encoded = np.append(x_features_encoded, np.array(position_feature), axis=1)
-feature_meta['add_position_features'] = add_position_features
+    # Add label position feature
+    if add_position_features:
+        x_features_encoded = np.hstack((x_features_encoded, training_data['position'].to_numpy().reshape(-1, 1)))
 
-# One hot encode
-y = np.zeros((n_samples, n_root), dtype=int)
-for i, j in enumerate(y_labels):
-    y[i, j] = 1
+    # C100 features
+    if add_isic_100_features:
+        c100_labels = pd.read_excel(work_dir + 'hscpc/c100_labels.xlsx')['sector'].to_list()
+        new_features = make_c100_features(training_data['source_row_label'].to_list(), c100_labels)
+        x_features_encoded = np.hstack((x_features_encoded, new_features))
 
-# Set feature store name (x)
-x = x_features_encoded.copy()
+    # Augment
+    if augment_training:
+        x_features_encoded, y = augment_by_adjacent_union(x_features_encoded, y, max_words, augment_factor)
+        n_samples = x_features_encoded.shape[0]
 
-# Shuffle
-indices = np.arange(x.shape[0])
-np.random.shuffle(indices)
-x = x[indices]
-y = y[indices]
+    # Final feature matrix
+    x = x_features_encoded.copy()
 
-# Split the x into a training set and a validation set
-n_samples = x.shape[0]
-n_train = int(n_samples*0.9)
-n_test = n_samples - n_train
+    # Save prepared dataset
+    prepared_data = {'x': x, 'y': y, 'tokenizer': tokenizer, 'max_words': max_words}
+    write_pickle(fname_prepared_data, prepared_data)
 
-x_train = x[:n_train]
-y_train = y[:n_train]
-x_test = x[n_train: n_train + n_test]
-y_test = y[n_train: n_train + n_test]
+# Training set properties
+n_features = x.shape[1]
+
+print('Training set contains ' + str(n_features) + ' features and ' + str(x.shape[0]) + ' records')
+
+# Test-train split
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_set_size)
 
 # Model
-#model = embedded_conv(max_words+1, x.shape[1], n_root)
-model = basic_dense(x.shape[1], n_root)
-#model = basic_dense_plus(x.shape[1], n_root)
+model = basic_dense_plus(n_features, n_root)
+# model = basic_dense(n_features, n_root)
 opt = Adam(learning_rate=alpha)
-model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['acc', 'categorical_accuracy'])
-history = model.fit(x_train, y_train, epochs=n_epochs, batch_size=n_batch_size, validation_data=(x_test, y_test))
+callback = EarlyStopping(monitor='loss', patience=3)
+model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['acc', 'categorical_accuracy', 'mean_squared_error'])
+history = model.fit(x_train, y_train, epochs=n_epochs, batch_size=n_batch_size, validation_data=(x_test, y_test),
+                    callbacks=[callback])
 
 preds = model.predict(x_test)
 preds[preds >= decision_boundary] = 1
@@ -150,6 +159,10 @@ write_pickle(model_fname, model)
 print('Saved model to disk. model_meta: ' + model_meta_name)
 
 # Save feature meta
+feature_meta = {'tokenizer': tokenizer, 'max_words': max_words}
+feature_meta['add_position_features'] = add_position_features
+feature_meta['add_isic_100_features'] = add_isic_100_features
+
 feature_meta_name = 'feature_meta_' + date_str_today + '_w' + str(max_words)
 fname_feature_meta = work_dir + 'model/' + feature_meta_name + '.pkl'
 write_pickle(fname_feature_meta, feature_meta)
