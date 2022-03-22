@@ -160,6 +160,9 @@ def create_source_label_vocabularly(raw_data_dir, training_data_dir, n_root):
 
     print('Removed ' + str(len_prior - len_new) + ' duplicate entries; ' + str(len_new) + ' entries remain')
 
+    # Delete unuseful words
+    words = ['and', 'or']
+
     # Save
     fname = training_data_dir + 'label_dictionary.pkl'
     label_store = pd.DataFrame(dictionary, columns=['source_labels'])

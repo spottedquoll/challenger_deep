@@ -1,5 +1,5 @@
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import (Dense, Dropout, BatchNormalization, Flatten, Embedding)
+from tensorflow.keras.layers import (Dense, Dropout, BatchNormalization, Flatten, Embedding, LSTM)
 from tensorflow.keras.layers import Conv1D, GlobalMaxPooling1D
 from tensorflow.keras.constraints import max_norm
 
@@ -34,11 +34,11 @@ def basic_dense(feature_dim, output_dim):
 def basic_dense_plus(feature_dim, output_dim):
 
     model = Sequential()
-    model.add(Dense(feature_dim, activation='relu', kernel_regularizer='l2', kernel_initializer='he_uniform'))
-    model.add(BatchNormalization())
+    model.add(Dense(round(feature_dim), activation='relu', kernel_regularizer='l2', kernel_initializer='he_uniform',
+                    input_dim=feature_dim))
     model.add(Dropout(0.1))
-    model.add(Dense(output_dim*1.5, activation='relu', kernel_constraint=max_norm(2.)))
+    model.add(Dense(output_dim, activation='relu'))
     model.add(Dropout(0.1))
-    model.add(Dense(output_dim, activation='softmax'))
+    model.add(Dense(output_dim, activation='sigmoid'))
 
     return model

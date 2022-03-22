@@ -33,38 +33,40 @@ def augment_by_adjacent_union(x, y, max_words, factor):
         The text labels and corresponding x indices of two adjacent records are joined
     """
 
-    n_real_records = x.shape[0]
-    extra_rows = int(n_real_records*factor)
+    if factor > 0:
 
-    for i in range(extra_rows):
+        n_real_records = x.shape[0]
+        extra_rows = int(n_real_records*factor)
 
-        # Select 2 indices to join
-        rand_idx = random.randint(0, n_real_records-2)
+        for i in range(extra_rows):
 
-        # Find a partner where at least one index overlaps
-        partner_idx = None
-        k = 0
-        while k <= 35 and partner_idx is None:
-            candidate_idx = random.randint(0, n_real_records - 2)
-            if candidate_idx != rand_idx and len(set(y[rand_idx]).intersection(set(y[candidate_idx]))) > 0:
-                partner_idx = candidate_idx
-            k = k + 1
+            # Select 2 indices to join
+            rand_idx = random.randint(0, n_real_records-2)
 
-        # Create joined record
-        if partner_idx is not None:
+            # Find a partner where at least one index overlaps
+            partner_idx = None
+            k = 0
+            while k <= 35 and partner_idx is None:
+                candidate_idx = random.randint(0, n_real_records - 2)
+                if candidate_idx != rand_idx and len(set(y[rand_idx]).intersection(set(y[candidate_idx]))) > 0:
+                    partner_idx = candidate_idx
+                k = k + 1
 
-            # Make aggregated features
-            new_x_label = x[rand_idx, 0:max_words] + x[partner_idx, 0:max_words]
-            new_x_label[new_x_label > 1] = 1  # restore as binary vector
-            new_other_features = np.mean(np.array([x[rand_idx, max_words:x.shape[1]], x[partner_idx, max_words:x.shape[1]]]), axis=0)
+            # Create joined record
+            if partner_idx is not None:
 
-            new_y_label = y[rand_idx, :] + y[partner_idx, :]
-            new_y_label[new_y_label > 1] = 1  # restore as binary vector
+                # Make aggregated features
+                new_x_label = x[rand_idx, 0:max_words] + x[partner_idx, 0:max_words]
+                new_x_label[new_x_label > 1] = 1  # restore as binary vector
+                new_other_features = np.mean(np.array([x[rand_idx, max_words:x.shape[1]], x[partner_idx, max_words:x.shape[1]]]), axis=0)
 
-            # Augment new record to training data
-            x = np.vstack((x, np.hstack((new_x_label, new_other_features))))
-            y = np.vstack((y, new_y_label))
+                new_y_label = y[rand_idx, :] + y[partner_idx, :]
+                new_y_label[new_y_label > 1] = 1  # restore as binary vector
 
-    print('Training x augmented from ' + str(n_real_records) + ' to ' + str(x.shape[0]) + ' records')
+                # Augment new record to training data
+                x = np.vstack((x, np.hstack((new_x_label, new_other_features))))
+                y = np.vstack((y, new_y_label))
+
+        print('Training x augmented from ' + str(n_real_records) + ' to ' + str(x.shape[0]) + ' records')
 
     return x, y

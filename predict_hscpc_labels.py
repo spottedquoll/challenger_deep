@@ -8,8 +8,8 @@ from library.make_estimated_conc import (maximum_match_probability, conc_flood_f
                                          conc_flood_fill_max_prob)
 
 # Switches
-model_version = 'model_2022-03-20_w3107_s14399_l4'
-feature_meta_version = 'feature_meta_2022-03-20_w3107'
+model_version = 'model_2022-03-21_w3107_s4114_l4'
+feature_meta_version = 'feature_meta_2022-03-21_w3107'
 target_label_file = 'MEX_labels_259'
 decision_boundary = 0.85
 
@@ -52,11 +52,6 @@ max_words = feature_meta['max_words']
 
 # One-hot-encode x labels
 x_features_encoded = encode_source_labels(tokenizer, x_labels, max_words)
-
-# # Add position features
-# if feature_meta['add_position_features']:
-#     position_feature = create_position_feature(len(x_labels), n_root)
-#     x_features_encoded = np.append(x_features_encoded, np.array(position_feature), axis=1)
 
 # Add label position feature
 if feature_meta['add_position_features']:

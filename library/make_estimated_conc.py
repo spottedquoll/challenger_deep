@@ -33,8 +33,7 @@ def conc_flood_fill_com(conc_estimated, threshold=0.95):
         # Select values larger than the threshold
         c_top_prob = conc_estimated_tr.loc[conc_estimated_tr[c] > tmp_threshold][[c, 'index_int']]
         count_matches = c_top_prob.shape[0]
-        if count_matches == 0:
-            stop=1
+
         assert count_matches > 0, 'No predictions for source label: ' + c
 
         probs = c_top_prob[c].values.reshape(-1, 1)
@@ -70,26 +69,28 @@ def conc_flood_fill_com(conc_estimated, threshold=0.95):
             matches = np.nonzero(row)
             assert matches is not None
 
-            # Choose direction in which to move
-            move = [min(matches[0]) - 1, max(matches[0]) + 1]
-            possible_moves = [x for x in move if 0 <= x <= n_columns-1]  # not reached edge
+            if matches[0] is not None and len(matches[0]) > 0:
 
-            if possible_moves is not None and possible_moves != []:
-                next_idx = random.choice(possible_moves)
-                if sum(conc_ar[:, next_idx]) == 0:  # column has no entries in other rows
-                    prob_new = conc_est_ar[i, next_idx]
-                    if prob_new >= min(min(conc_est_ar[i, matches])):
-                        conc_ar[i, next_idx] = 1
-                    elif prob_new * (1+(k/max_iter)) >= np.quantile(conc_est_ar[i, :], 0.98):
-                        conc_ar[i, next_idx] = 1
-                    elif conc_rel_imp[i, next_idx] * (1+(0.8*k/max_iter)) > max(conc_rel_imp[:, next_idx]):
-                        conc_ar[i, next_idx] = 1
-                    elif np.sum(conc_ar[i, 0:next_idx], axis=0) == 0:  # lower edge
-                        assert sum(conc_ar[:, next_idx]) == 0
-                        conc_ar[i, next_idx] = 1
-                    elif np.sum(conc_ar[i, next_idx:], axis=0) == 0:  # upper edge
-                        assert sum(conc_ar[:, next_idx]) == 0
-                        conc_ar[i, next_idx] = 1
+                # Choose direction in which to move
+                move = [min(matches[0]) - 1, max(matches[0]) + 1]
+                possible_moves = [x for x in move if 0 <= x <= n_columns-1]  # not reached edge
+
+                if possible_moves is not None and possible_moves != []:
+                    next_idx = random.choice(possible_moves)
+                    if sum(conc_ar[:, next_idx]) == 0:  # column has no entries in other rows
+                        prob_new = conc_est_ar[i, next_idx]
+                        if prob_new >= min(min(conc_est_ar[i, matches])):
+                            conc_ar[i, next_idx] = 1
+                        elif prob_new * (1+(k/max_iter)) >= np.quantile(conc_est_ar[i, :], 0.98):
+                            conc_ar[i, next_idx] = 1
+                        elif conc_rel_imp[i, next_idx] * (1+(0.8*k/max_iter)) > max(conc_rel_imp[:, next_idx]):
+                            conc_ar[i, next_idx] = 1
+                        elif np.sum(conc_ar[i, 0:next_idx], axis=0) == 0:  # lower edge
+                            assert sum(conc_ar[:, next_idx]) == 0
+                            conc_ar[i, next_idx] = 1
+                        elif np.sum(conc_ar[i, next_idx:], axis=0) == 0:  # upper edge
+                            assert sum(conc_ar[:, next_idx]) == 0
+                            conc_ar[i, next_idx] = 1
 
         k = k + 1
 
@@ -232,6 +233,9 @@ def conc_flood_fill_max_prob(conc_estimated, threshold=0.95):
 
             prob = probs_sorted[k]
             c_top_prob = conc_est_tr.loc[(conc_est_tr[c] >= prob) & (conc_est_tr[c] < previous_prob)][[c, 'index_int']]
+
+            if c_top_prob is None or len(c_top_prob) == 0:
+                stop = 1
 
             j = c_top_prob['index_int'].values[0]
             if sum(conc_ar[:, j]) == 0:

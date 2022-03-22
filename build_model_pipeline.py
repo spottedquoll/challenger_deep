@@ -1,4 +1,4 @@
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam, SGD
 from tensorflow.keras.callbacks import EarlyStopping
 import pandas as pd
 import numpy as np
@@ -16,20 +16,20 @@ from library.model_configs import embedded_conv, basic_dense, basic_dense_plus
 print('Building predictive model')
 
 # Switches
-use_prepared_data = True
+use_prepared_data = False
 extract_training_data = False
 rebuild_source_vocabularly = False
-augment_training = True
+augment_training = False
 add_position_features = True
 add_isic_100_features = True
 
 # Settings
-augment_factor = 3
+augment_factor = 2
 test_set_size = 0.1
 max_vocab_fraction = 0.99
 decision_boundary = 0.90
-n_epochs = 20
-n_batch_size = 600
+n_epochs = 30
+n_batch_size = 900
 alpha = 0.0001  # learning rate
 
 # Constants
@@ -44,7 +44,7 @@ training_data_dir = work_dir + 'training_data/'
 
 create_dir_if_nonexist(training_data_dir)
 
-fname_prepared_data = work_dir + 'training_data/' + 'prepared_data' + '.pkl'
+fname_prepared_data = work_dir + 'training_data/' + 'prepared_data_aug' + str(augment_training) + '.pkl'
 if use_prepared_data:
     prepared_data = read_pickle(fname_prepared_data)
     x = prepared_data['x']
@@ -94,6 +94,7 @@ else:
 
     # C100 features
     if add_isic_100_features:
+        print('Calculating string similarity between x labels and C100...')
         c100_labels = pd.read_excel(work_dir + 'hscpc/c100_labels.xlsx')['sector'].to_list()
         new_features = make_c100_features(training_data['source_row_label'].to_list(), c100_labels)
         x_features_encoded = np.hstack((x_features_encoded, new_features))
@@ -101,7 +102,6 @@ else:
     # Augment
     if augment_training:
         x_features_encoded, y = augment_by_adjacent_union(x_features_encoded, y, max_words, augment_factor)
-        n_samples = x_features_encoded.shape[0]
 
     # Final feature matrix
     x = x_features_encoded.copy()
@@ -112,6 +112,7 @@ else:
 
 # Training set properties
 n_features = x.shape[1]
+n_samples = x.shape[0]
 
 print('Training set contains ' + str(n_features) + ' features and ' + str(x.shape[0]) + ' records')
 
@@ -119,10 +120,10 @@ print('Training set contains ' + str(n_features) + ' features and ' + str(x.shap
 x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_set_size)
 
 # Model
-model = basic_dense_plus(n_features, n_root)
-# model = basic_dense(n_features, n_root)
+# model = basic_dense_plus(n_features, n_root)
+model = basic_dense(n_features, n_root)
 opt = Adam(learning_rate=alpha)
-callback = EarlyStopping(monitor='loss', patience=3)
+callback = EarlyStopping(monitor='acc', patience=3)
 model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['acc', 'categorical_accuracy', 'mean_squared_error'])
 history = model.fit(x_train, y_train, epochs=n_epochs, batch_size=n_batch_size, validation_data=(x_test, y_test),
                     callbacks=[callback])
@@ -138,7 +139,7 @@ rmse = np.sqrt(np.mean(np.square(preds - y_test)))
 print('Accuracy: ' + "{:.4f}".format(acc) + ', SSE: ' + str(sse) + ', RMSE: ' + "{:.3f}".format(rmse))
 
 # Retrain model with full training set (should the batch size be reset here?)
-model.fit(x, y, epochs=n_epochs, batch_size=n_batch_size, validation_data=(x, y))
+model.fit(x, y, epochs=n_epochs, batch_size=n_batch_size, validation_data=(x, y), callbacks=[callback])
 
 preds = model.predict(x)
 preds[preds >= decision_boundary] = 1
