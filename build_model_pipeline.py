@@ -17,9 +17,9 @@ print('Building predictive model')
 
 # Switches
 use_prepared_data = False
-extract_training_data = False
-rebuild_source_vocabularly = False
-augment_training = False
+extract_training_data = True
+rebuild_source_vocabularly = True
+augment_training = True
 add_position_features = True
 add_isic_100_features = True
 
@@ -99,7 +99,7 @@ else:
         new_features = make_c100_features(training_data['source_row_label'].to_list(), c100_labels)
         x_features_encoded = np.hstack((x_features_encoded, new_features))
 
-    # Augment
+    # Augment (augment 'real' training data with extra generated samples)
     if augment_training:
         x_features_encoded, y = augment_by_adjacent_union(x_features_encoded, y, max_words, augment_factor)
 
@@ -138,7 +138,7 @@ rmse = np.sqrt(np.mean(np.square(preds - y_test)))
 
 print('Accuracy: ' + "{:.4f}".format(acc) + ', SSE: ' + str(sse) + ', RMSE: ' + "{:.3f}".format(rmse))
 
-# Retrain model with full training set (should the batch size be reset here?)
+# Retrain model with full training set
 model.fit(x, y, epochs=n_epochs, batch_size=n_batch_size, validation_data=(x, y), callbacks=[callback])
 
 preds = model.predict(x)

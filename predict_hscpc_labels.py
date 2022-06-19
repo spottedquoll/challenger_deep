@@ -10,7 +10,7 @@ from library.make_estimated_conc import (maximum_match_probability, conc_flood_f
 # Switches
 model_version = 'model_2022-03-21_w3107_s4114_l4'
 feature_meta_version = 'feature_meta_2022-03-21_w3107'
-target_label_file = 'MEX_labels_259'
+target_label_file = 'USA_BEA_15_labels'
 decision_boundary = 0.85
 
 print('Predicting ' + target_label_file + ' HSCPC matches')
