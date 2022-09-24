@@ -7,12 +7,11 @@ from utils import is_empty
 from library.feature_engineering import clean_text_label, dictionary_supplement
 
 
-def extract_concordances(training_data_path, save_path):
+def extract_concordances_into_rows(training_data_path, save_path, n_root=6357):
 
     print('Extracting training data from HSCPC concordances')
 
     # Constants
-    n_root = 6357
     empty_col_name = 'Unnamed: 0'
 
     # Discover all the training concs in the folder
@@ -31,7 +30,7 @@ def extract_concordances(training_data_path, save_path):
         if '.xlsx' in fname and '~$' not in fname:
 
             # Read the concordance file
-            df = pd.read_excel(f)
+            df = pd.read_excel(f, sheet_name=0, header=0)
 
             # Check the dimensions
             columns = df.columns
@@ -171,3 +170,40 @@ def create_source_label_vocabularly(raw_data_dir, training_data_dir, n_root):
     print('Finished building vocabularly')
 
 
+def extract_concordances_single_row(training_data_path, save_path, n_root=6357):
+
+    print('Extracting training data from HSCPC concordances')
+
+    # Constants
+    empty_col_name = 'Unnamed: 0'
+
+    # Discover all the training concs in the folder
+    conc_files = glob.glob(os.path.join(training_data_path, "*.xlsx"))
+
+    feature_store = []
+
+    # loop over the list of csv files
+    for f in conc_files:
+
+        fname = Path(f).name
+
+        print('.')
+        print('Extracting ' + fname)
+
+        if '.xlsx' in fname and '~$' not in fname:
+            # Read the concordance file
+            df = pd.read_excel(f, sheet_name=0, header=0)
+
+            # Check the dimensions
+            columns = df.columns
+            assert len(columns) == n_root + 1
+
+            # Get the source labels
+            assert columns[0] == empty_col_name
+            source_labels = df[[empty_col_name]].values
+            df.rename(columns={empty_col_name: "labels"}, inplace=True)
+
+            n_source = len(source_labels)
+
+            # Set labels as row indexes
+            conc = df.set_index('labels')

@@ -1,6 +1,7 @@
 import string
 import numpy as np
-from tensorflow.keras.preprocessing.text import Tokenizer
+from keras.preprocessing.text import Tokenizer
+from keras.utils import pad_sequences
 from fuzzywuzzy import fuzz
 
 
@@ -21,10 +22,7 @@ def create_position_feature(x_labels):
     return features
 
 
-def encode_source_labels(tokenizer, x_labels, max_words):
-
-    # Tokenize the labels
-    sequences = tokenizer.texts_to_sequences(x_labels)
+def one_hot_encode_source_labels(sequences, x_labels, max_words):
 
     # Create store for enconded labels
     n_samples = len(x_labels)
@@ -94,7 +92,18 @@ def make_c100_features(source_labels, c100_labels):
             assert np.isfinite(score)
             f[i, j] = score
 
-    # Should be normalised
+    # Ensure normalisation
     assert np.min(f.reshape(-1)) >= 0 and np.max(f.reshape(-1)) <= 1
 
     return f
+
+
+def encode_x_labels(sequences, x_labels, max_words, one_hot_encoding=True):
+
+    if one_hot_encoding:
+        x_features_encoded = one_hot_encode_source_labels(sequences, x_labels, max_words)
+    else:
+        max_len = max([len(x) for x in sequences])
+        x_features_encoded = pad_sequences(sequences, padding='post', truncating='post', maxlen=max_len)
+
+    return x_features_encoded

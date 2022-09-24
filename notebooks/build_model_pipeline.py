@@ -1,15 +1,15 @@
-from tensorflow.keras.optimizers import Adam, SGD
-from tensorflow.keras.callbacks import EarlyStopping
+from keras.optimizers import Adam, SGD
+from keras.callbacks import EarlyStopping
 import pandas as pd
 import numpy as np
 import os
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
-from library.feature_engineering import encode_source_labels, create_tokenizer, make_c100_features
+from library.feature_engineering import encode_x_labels, create_tokenizer, make_c100_features
 from library.augmentation import augment_by_adjacent_union
 from datetime import date
 from utils import write_pickle, create_dir_if_nonexist, read_pickle
-from library.training_toolkit import extract_concordances, create_source_label_vocabularly
+from library.training_toolkit import extract_concordances_into_rows, create_source_label_vocabularly
 from library.model_configs import embedded_conv, basic_dense, basic_dense_plus
 
 
@@ -19,9 +19,10 @@ print('Building predictive model')
 use_prepared_data = False
 extract_training_data = True
 rebuild_source_vocabularly = True
-augment_training = True
+augment_training = False
 add_position_features = True
 add_isic_100_features = True
+x_feature_one_hot_encoding = False
 
 # Settings
 augment_factor = 2
@@ -40,22 +41,28 @@ date_str_today = date.today().strftime("%Y-%m-%d")
 # Paths
 work_dir = os.environ['work_dir']
 raw_data_dir = work_dir + 'training_concs_hscpc/'
-training_data_dir = work_dir + 'training_data/'
 
+training_data_dir = work_dir + 'training_data/'
 create_dir_if_nonexist(training_data_dir)
+
+model_dir = work_dir + 'model/'
+create_dir_if_nonexist(model_dir)
 
 fname_prepared_data = work_dir + 'training_data/' + 'prepared_data_aug' + str(augment_training) + '.pkl'
 if use_prepared_data:
+
     prepared_data = read_pickle(fname_prepared_data)
     x = prepared_data['x']
     y = prepared_data['y']
     tokenizer = prepared_data['tokenizer']
     max_words = prepared_data['max_words']
+    sequences = prepared_data['sequences']
+
 else:
 
     # Extract training data
     if extract_training_data:
-        extract_concordances(raw_data_dir, training_data_dir)
+        extract_concordances_into_rows(raw_data_dir, training_data_dir)
 
     # Construct the vocabulary from the source data
     if rebuild_source_vocabularly:
@@ -81,12 +88,13 @@ else:
     for i, j in enumerate(y_labels):
         y[i, j] = 1
 
-    # Create tokenizer, configured to only take into account the max_words
+    # Create tokenizer (limited to max_words)
     source_vocab = source_label_vocab['source_labels'].to_list()
     tokenizer, max_words = create_tokenizer(source_vocab, max_vocab_fraction)
+    sequences = tokenizer.texts_to_sequences(x_labels)
 
-    # One-hot-encode x labels
-    x_features_encoded = encode_source_labels(tokenizer, x_labels, max_words)
+    # Encode x labels
+    x_features_encoded = encode_x_labels(sequences, x_labels, max_words, one_hot_encoding=x_feature_one_hot_encoding)
 
     # Add label position feature
     if add_position_features:
@@ -107,7 +115,9 @@ else:
     x = x_features_encoded.copy()
 
     # Save prepared dataset
-    prepared_data = {'x': x, 'y': y, 'tokenizer': tokenizer, 'max_words': max_words}
+    prepared_data = {'x': x, 'y': y, 'tokenizer': tokenizer, 'max_words': max_words, 'sequences': sequences,
+                     'x_feature_one_hot_encoding': x_feature_one_hot_encoding}
+
     write_pickle(fname_prepared_data, prepared_data)
 
 # Training set properties
@@ -124,7 +134,9 @@ x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_set_siz
 model = basic_dense(n_features, n_root)
 opt = Adam(learning_rate=alpha)
 callback = EarlyStopping(monitor='acc', patience=3)
-model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['acc', 'categorical_accuracy', 'mean_squared_error'])
+model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['acc', 'categorical_accuracy',
+                                                                       'mean_squared_error'])
+
 history = model.fit(x_train, y_train, epochs=n_epochs, batch_size=n_batch_size, validation_data=(x_test, y_test),
                     callbacks=[callback])
 
@@ -154,15 +166,15 @@ print('Final score: accuracy: ' + "{:.4f}".format(acc) + ', SSD: ' + str(sse) + 
 # Save model object
 n_layers = len(model.layers)
 model_meta_name = 'model_' + date_str_today + '_w' + str(max_words) + '_s' + str(n_samples) + '_l' + str(n_layers)
-model_fname = work_dir + 'model/' + model_meta_name + '.pkl'
+model_fname = model_dir + model_meta_name + '.pkl'
 write_pickle(model_fname, model)
 
 print('Saved model to disk. model_meta: ' + model_meta_name)
 
 # Save feature meta
-feature_meta = {'tokenizer': tokenizer, 'max_words': max_words}
-feature_meta['add_position_features'] = add_position_features
-feature_meta['add_isic_100_features'] = add_isic_100_features
+feature_meta = {'tokenizer': tokenizer, 'max_words': max_words, 'add_position_features': add_position_features,
+                'sequences': sequences, 'add_isic_100_features': add_isic_100_features,
+                'x_feature_one_hot_encoding': x_feature_one_hot_encoding}
 
 feature_meta_name = 'feature_meta_' + date_str_today + '_w' + str(max_words)
 fname_feature_meta = work_dir + 'model/' + feature_meta_name + '.pkl'

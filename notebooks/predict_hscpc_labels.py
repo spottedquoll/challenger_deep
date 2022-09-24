@@ -2,14 +2,14 @@ import os
 from utils import read_pickle
 import numpy as np
 import pandas as pd
-from library.feature_engineering import encode_source_labels, clean_text_label, create_position_feature, make_c100_features
+from library.feature_engineering import encode_x_labels, clean_text_label, create_position_feature, make_c100_features
 from utils import duplicates_in_list
 from library.make_estimated_conc import (maximum_match_probability, conc_flood_fill_com, conc_from_decision_boundary,
                                          conc_flood_fill_max_prob)
 
 # Switches
-model_version = 'model_2022-03-21_w3107_s4114_l4'
-feature_meta_version = 'feature_meta_2022-03-21_w3107'
+model_version = 'model_2022-09-24_w3126_s4521_l4'
+feature_meta_version = 'feature_meta_2022-09-24_w3126'
 target_label_file = 'USA_BEA_15_labels'
 decision_boundary = 0.85
 
@@ -47,11 +47,14 @@ assert not duplicates_in_list(x_labels)
 feature_meta_fname = work_dir + 'model/' + feature_meta_version + '.pkl'
 feature_meta = read_pickle(feature_meta_fname)
 
+# Unpack tokenizer
 tokenizer = feature_meta['tokenizer']
+sequences = feature_meta['sequences']
 max_words = feature_meta['max_words']
+x_feature_one_hot_encoding = feature_meta['x_feature_one_hot_encoding']
 
 # One-hot-encode x labels
-x_features_encoded = encode_source_labels(tokenizer, x_labels, max_words)
+x_features_encoded = encode_x_labels(sequences, x_labels, max_words, one_hot_encoding=x_feature_one_hot_encoding)
 
 # Add label position feature
 if feature_meta['add_position_features']:
@@ -69,10 +72,12 @@ model_fname = model_dir + model_version + '.pkl'
 model = read_pickle(model_fname)
 
 # Make prediction
-source_name = target_label_file.replace('_labels', '')
 preds = model.predict(x_features_encoded)
 
+# Save predictions
 print('Saving concordance predictions')
+
+source_name = target_label_file.replace('_labels', '')
 fname_prefix = prediction_dir + 'challenger_deep_predict_' + source_name
 
 # Save raw estimates
@@ -94,6 +99,5 @@ conc_max_prob.to_excel(fname_prefix + '_conc_max_prob' + '.xlsx')
 # Center of mass
 conc_com = conc_flood_fill_max_prob(conc_raw_estimates.copy())
 conc_com.to_excel(fname_prefix + '_conc_flood_fill_max_prob' + '.xlsx')
-
 
 print('Finished writing predictons to ' + prediction_dir)

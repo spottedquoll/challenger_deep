@@ -1,5 +1,4 @@
 import random
-
 import numpy as np
 
 
@@ -58,7 +57,8 @@ def augment_by_adjacent_union(x, y, max_words, factor):
                 # Make aggregated features
                 new_x_label = x[rand_idx, 0:max_words] + x[partner_idx, 0:max_words]
                 new_x_label[new_x_label > 1] = 1  # restore as binary vector
-                new_other_features = np.mean(np.array([x[rand_idx, max_words:x.shape[1]], x[partner_idx, max_words:x.shape[1]]]), axis=0)
+                new_other_features = np.mean(np.array([x[rand_idx, max_words:x.shape[1]],
+                                                       x[partner_idx, max_words:x.shape[1]]]), axis=0)
 
                 new_y_label = y[rand_idx, :] + y[partner_idx, :]
                 new_y_label[new_y_label > 1] = 1  # restore as binary vector
