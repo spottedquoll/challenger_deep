@@ -17,12 +17,12 @@ print('Building predictive model')
 
 # Switches
 use_prepared_data = False
-extract_training_data = True
-rebuild_source_vocabularly = True
+extract_training_data = False
+rebuild_source_vocabularly = False
 augment_training = False
 add_position_features = True
 add_isic_100_features = True
-x_feature_one_hot_encoding = False
+x_feature_one_hot_encoding = True
 
 # Settings
 augment_factor = 2
@@ -91,10 +91,9 @@ else:
     # Create tokenizer (limited to max_words)
     source_vocab = source_label_vocab['source_labels'].to_list()
     tokenizer, max_words = create_tokenizer(source_vocab, max_vocab_fraction)
-    sequences = tokenizer.texts_to_sequences(x_labels)
 
     # Encode x labels
-    x_features_encoded = encode_x_labels(sequences, x_labels, max_words, one_hot_encoding=x_feature_one_hot_encoding)
+    x_features_encoded = encode_x_labels(tokenizer, x_labels, max_words, one_hot_encoding=x_feature_one_hot_encoding)
 
     # Add label position feature
     if add_position_features:

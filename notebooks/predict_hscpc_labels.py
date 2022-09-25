@@ -3,13 +3,13 @@ from utils import read_pickle
 import numpy as np
 import pandas as pd
 from library.feature_engineering import encode_x_labels, clean_text_label, create_position_feature, make_c100_features
-from utils import duplicates_in_list
+from utils import duplicates_in_list, create_dir_if_nonexist
 from library.make_estimated_conc import (maximum_match_probability, conc_flood_fill_com, conc_from_decision_boundary,
                                          conc_flood_fill_max_prob)
 
-# Switches
-model_version = 'model_2022-09-24_w3126_s4521_l4'
-feature_meta_version = 'feature_meta_2022-09-24_w3126'
+# Settings
+model_version = 'model_2022-09-25_w3126_s4521_l4'
+feature_meta_version = 'feature_meta_2022-09-25_w3126'
 target_label_file = 'USA_BEA_15_labels'
 decision_boundary = 0.85
 
@@ -21,8 +21,10 @@ n_root = 6357
 # Paths
 work_dir = os.environ['work_dir'] + '/'
 model_dir = work_dir + 'model/'
-prediction_dir = work_dir + 'predictions/'
 label_dir = work_dir + 'input_labels/'
+
+prediction_dir = work_dir + 'predictions/'
+create_dir_if_nonexist(prediction_dir)
 
 # Extract target labels
 df = pd.read_excel(label_dir + target_label_file + '.xlsx', header=None)
@@ -47,14 +49,11 @@ assert not duplicates_in_list(x_labels)
 feature_meta_fname = work_dir + 'model/' + feature_meta_version + '.pkl'
 feature_meta = read_pickle(feature_meta_fname)
 
-# Unpack tokenizer
-tokenizer = feature_meta['tokenizer']
-sequences = feature_meta['sequences']
-max_words = feature_meta['max_words']
-x_feature_one_hot_encoding = feature_meta['x_feature_one_hot_encoding']
-
 # One-hot-encode x labels
-x_features_encoded = encode_x_labels(sequences, x_labels, max_words, one_hot_encoding=x_feature_one_hot_encoding)
+x_features_encoded = encode_x_labels(feature_meta['tokenizer'],
+                                     x_labels,
+                                     feature_meta['max_words'],
+                                     one_hot_encoding=feature_meta['x_feature_one_hot_encoding'])
 
 # Add label position feature
 if feature_meta['add_position_features']:

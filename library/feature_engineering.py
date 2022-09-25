@@ -98,7 +98,10 @@ def make_c100_features(source_labels, c100_labels):
     return f
 
 
-def encode_x_labels(sequences, x_labels, max_words, one_hot_encoding=True):
+def encode_x_labels(tokenizer, x_labels, max_words, one_hot_encoding=True):
+
+    # Tokenize the labels
+    sequences = tokenizer.texts_to_sequences(x_labels)
 
     if one_hot_encoding:
         x_features_encoded = one_hot_encode_source_labels(sequences, x_labels, max_words)
