@@ -88,6 +88,16 @@ def extract_concordances_into_rows(training_data_path, save_path, n_root=6357):
     print('Finished extracting concordances')
 
 
+def get_training_data(raw_data_dir, training_data_dir, extract_training_data=True):
+
+    if extract_training_data:
+        extract_concordances_into_rows(raw_data_dir, training_data_dir)
+
+    training_data = pd.read_pickle(training_data_dir + 'hscpc_collected_training_set.pkl')
+
+    return training_data
+
+
 def create_source_label_vocabularly(raw_data_dir, training_data_dir, n_root):
 
     print('Creating source label vocab')
@@ -170,7 +180,7 @@ def create_source_label_vocabularly(raw_data_dir, training_data_dir, n_root):
     print('Finished building vocabularly')
 
 
-def extract_concordances_single_row(training_data_path, save_path, n_root=6357):
+def extract_train_concs_as_sequence(training_data_path, save_path, n_root=6357):
 
     print('Extracting training data from HSCPC concordances')
 
@@ -187,10 +197,10 @@ def extract_concordances_single_row(training_data_path, save_path, n_root=6357):
 
         fname = Path(f).name
 
-        print('.')
-        print('Extracting ' + fname)
+        print('... ' + fname)
 
         if '.xlsx' in fname and '~$' not in fname:
+
             # Read the concordance file
             df = pd.read_excel(f, sheet_name=0, header=0)
 
@@ -207,3 +217,46 @@ def extract_concordances_single_row(training_data_path, save_path, n_root=6357):
 
             # Set labels as row indexes
             conc = df.set_index('labels')
+
+            # Convert to array
+            assert not conc.isnull().values.any()
+            conc_ar = conc.to_numpy(dtype=int, copy=True)  # what do NaNs get converted as?
+
+            assert conc_ar.shape[0] == n_source and conc_ar.shape[1] == n_root
+
+            tmp_store = []
+            hscpc_seq = ''
+            src_lbl_seq = ''
+
+            for i, r in enumerate(conc_ar):
+
+                row_label = str(source_labels[i][0])
+                row_label = clean_text_label(row_label)
+
+                assert all(np.isfinite(r))
+                assert np.min(r) >= 0 and np.max(r) <= 1, ('Non-binary values found on line: ' + str(i) +
+                                                           ', label: ' + row_label)
+
+                # Find indices of HSCPC labels
+                if np.sum(r) > 0:
+
+                    # Indices of non-zero elements
+                    nnzs = np.where(r > 0)[0]
+                    assert not is_empty(nnzs)
+                    hscpc_labels = nnzs
+
+                    # Make sequences
+                    hscpc_seq = hscpc_seq + ' ZZZZ ' + ' '.join([str(x) for x in hscpc_labels])
+                    src_lbl_seq = src_lbl_seq + ' ZZZZ ' + row_label
+
+            # Store
+            tmp_store.append({'conc': fname, 'source_label_sequence': src_lbl_seq, 'hscpc_sequence': hscpc_seq})
+            feature_store.extend(tmp_store)
+
+    print('Feature store contains: ' + str(len(feature_store)))
+
+    fname = save_path + 'sequence_training_set.pkl'
+    feature_fd = pd.DataFrame(feature_store)
+    feature_fd.to_pickle(fname)
+
+    print('Finished extracting concordances')

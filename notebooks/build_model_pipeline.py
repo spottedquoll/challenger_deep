@@ -9,29 +9,29 @@ from library.feature_engineering import encode_x_labels, create_tokenizer, make_
 from library.augmentation import augment_by_adjacent_union
 from datetime import date
 from utils import write_pickle, create_dir_if_nonexist, read_pickle
-from library.training_toolkit import extract_concordances_into_rows, create_source_label_vocabularly
+from library.extract_training_datasets import get_training_data, create_source_label_vocabularly
 from library.model_configs import embedded_conv, basic_dense, basic_dense_plus
 
 
 print('Building predictive model')
 
 # Switches
-use_prepared_data = False
+use_prepared_data = True
 extract_training_data = False
 rebuild_source_vocabularly = False
 augment_training = False
 add_position_features = True
 add_isic_100_features = True
-x_feature_one_hot_encoding = True
+x_feature_one_hot_encoding = False
 
 # Settings
 augment_factor = 2
 test_set_size = 0.1
 max_vocab_fraction = 0.99
 decision_boundary = 0.90
-n_epochs = 30
-n_batch_size = 900
-alpha = 0.0001  # learning rate
+n_epochs = 50
+n_batch_size = 100
+alpha = 0.00000001  # learning rate
 
 # Constants
 n_root = 6357
@@ -56,13 +56,11 @@ if use_prepared_data:
     y = prepared_data['y']
     tokenizer = prepared_data['tokenizer']
     max_words = prepared_data['max_words']
-    sequences = prepared_data['sequences']
 
 else:
 
     # Extract training data
-    if extract_training_data:
-        extract_concordances_into_rows(raw_data_dir, training_data_dir)
+    training_data = get_training_data(raw_data_dir, training_data_dir, extract_training_data=extract_training_data)
 
     # Construct the vocabulary from the source data
     if rebuild_source_vocabularly:
@@ -71,9 +69,7 @@ else:
     # Read the vocabularly
     source_label_vocab = pd.read_pickle(training_data_dir + 'label_dictionary.pkl')
 
-    # Read and wrangle the training data
-    training_data = pd.read_pickle(training_data_dir + 'hscpc_collected_training_set.pkl')
-
+    # Define training data
     x_labels = training_data['source_row_label'].to_list()
     y_labels = training_data['hscpc_labels'].to_list()
     n_samples = len(x_labels)
@@ -81,7 +77,8 @@ else:
     # Tests; check input data
     max_hscpc_index = [max(s) for s in zip(*y_labels)]
     min_hscpc_index = [min(s) for s in zip(*y_labels)]
-    assert max_hscpc_index[0] == n_root-1 and min_hscpc_index[0] == 0
+
+    assert min_hscpc_index[0] == 0 and max_hscpc_index[0] == n_root-1
 
     # One hot encode y
     y = np.zeros((n_samples, n_root), dtype=int)
@@ -102,11 +99,12 @@ else:
     # C100 features
     if add_isic_100_features:
         print('Calculating string similarity between x labels and C100...')
+
         c100_labels = pd.read_excel(work_dir + 'hscpc/c100_labels.xlsx')['sector'].to_list()
         new_features = make_c100_features(training_data['source_row_label'].to_list(), c100_labels)
         x_features_encoded = np.hstack((x_features_encoded, new_features))
 
-    # Augment (augment 'real' training data with extra generated samples)
+    # Augment
     if augment_training:
         x_features_encoded, y = augment_by_adjacent_union(x_features_encoded, y, max_words, augment_factor)
 
@@ -114,7 +112,7 @@ else:
     x = x_features_encoded.copy()
 
     # Save prepared dataset
-    prepared_data = {'x': x, 'y': y, 'tokenizer': tokenizer, 'max_words': max_words, 'sequences': sequences,
+    prepared_data = {'x': x, 'y': y, 'tokenizer': tokenizer, 'max_words': max_words,
                      'x_feature_one_hot_encoding': x_feature_one_hot_encoding}
 
     write_pickle(fname_prepared_data, prepared_data)
@@ -129,10 +127,10 @@ print('Training set contains ' + str(n_features) + ' features and ' + str(x.shap
 x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_set_size)
 
 # Model
-# model = basic_dense_plus(n_features, n_root)
-model = basic_dense(n_features, n_root)
+model = basic_dense_plus(n_features, n_root)
+# model = basic_dense(n_features, n_root)
 opt = Adam(learning_rate=alpha)
-callback = EarlyStopping(monitor='acc', patience=3)
+callback = EarlyStopping(monitor='acc', patience=4)
 model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['acc', 'categorical_accuracy',
                                                                        'mean_squared_error'])
 
@@ -159,8 +157,10 @@ preds[preds < decision_boundary] = 0
 acc = accuracy_score(y, preds)
 sse = np.sum(np.square(preds - y))
 rmse = np.sqrt(np.mean(np.square(preds - y)))
+mae = np.mean(y - preds)
 
-print('Final score: accuracy: ' + "{:.4f}".format(acc) + ', SSD: ' + str(sse) + ', RMSE: ' + "{:.3f}".format(rmse))
+print('Final score: accuracy: ' + "{:.4f}".format(acc) + ', SSD: ' + str(sse) + ', RMSE: ' + "{:.3f}".format(rmse) +
+      ', MAE: ' + "{:.6f}".format(mae))
 
 # Save model object
 n_layers = len(model.layers)
@@ -172,7 +172,7 @@ print('Saved model to disk. model_meta: ' + model_meta_name)
 
 # Save feature meta
 feature_meta = {'tokenizer': tokenizer, 'max_words': max_words, 'add_position_features': add_position_features,
-                'sequences': sequences, 'add_isic_100_features': add_isic_100_features,
+                'add_isic_100_features': add_isic_100_features,
                 'x_feature_one_hot_encoding': x_feature_one_hot_encoding}
 
 feature_meta_name = 'feature_meta_' + date_str_today + '_w' + str(max_words)

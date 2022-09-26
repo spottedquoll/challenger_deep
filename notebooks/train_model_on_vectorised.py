@@ -1,5 +1,5 @@
 import os
-from library.training_toolkit import extract_concordances_single_row
+from library.extract_training_datasets import extract_train_concs_as_sequence
 from utils import create_dir_if_nonexist
 
 # Switches
@@ -15,4 +15,4 @@ create_dir_if_nonexist(model_dir)
 
 # Extract training data
 if extract_training_data:
-    extract_concordances_single_row(raw_data_dir, training_data_dir)
+    extract_train_concs_as_sequence(raw_data_dir, training_data_dir)

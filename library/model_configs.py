@@ -36,9 +36,12 @@ def basic_dense_plus(feature_dim, output_dim):
     model = Sequential()
     model.add(Dense(round(feature_dim), activation='relu', kernel_regularizer='l2', kernel_initializer='he_uniform',
                     input_dim=feature_dim))
+    model.add(BatchNormalization())
     model.add(Dropout(0.1))
-    model.add(Dense(output_dim, activation='relu'))
-    model.add(Dropout(0.1))
+    model.add(Dense(int(output_dim / 10), activation='relu'))
+    model.add(Dense(int(output_dim / 6), activation='relu'))
+    model.add(Dense(int(output_dim), activation='relu'))
+    model.add(Dense(int(output_dim), activation='relu'))
     model.add(Dense(output_dim, activation='sigmoid'))
 
     return model
