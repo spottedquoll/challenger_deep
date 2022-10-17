@@ -68,10 +68,8 @@ def dictionary_supplement():
 def create_tokenizer(source_vocab, max_fraction):
 
     max_words = int(max_fraction * len(source_vocab))
-    tokenizer = Tokenizer(num_words=max_words, filters='!"#$%&()*+,-./:;<=>?@[\\]^_`{|}~\t\n', lower=True, split=' ')
+    tokenizer = Tokenizer(num_words=max_words, filters='!"#$%&()*+-/:;<=>?@[\\]^_`{|}~\t\n', lower=True, split=' ')
     tokenizer.fit_on_texts(source_vocab)
-
-    print('Source vocab length: ' + str(len(source_vocab)) + ', max word setting: ' + str(max_words))
 
     return tokenizer, max_words
 
@@ -98,15 +96,56 @@ def make_c100_features(source_labels, c100_labels):
     return f
 
 
-def encode_x_labels(tokenizer, x_labels, max_words, one_hot_encoding=True):
+def encode_x_labels(tokenizer, x_labels, max_words, one_hot_encoding=True, max_len=None):
 
     # Tokenize the labels
     sequences = tokenizer.texts_to_sequences(x_labels)
 
     if one_hot_encoding:
         x_features_encoded = one_hot_encode_source_labels(sequences, x_labels, max_words)
+        return x_features_encoded, None
     else:
-        max_len = max([len(x) for x in sequences])
+        if max_len is None:
+            max_len = max([len(x) for x in sequences])
         x_features_encoded = pad_sequences(sequences, padding='post', truncating='post', maxlen=max_len)
+
+        return x_features_encoded, max_len
+
+
+def encode_text_sequences(texts, max_words_fraction=0.95, pad=True, pad_position='post', max_len=None):
+
+    # Tests
+    # assert texts is list_like
+    assert 0 < max_words_fraction <= 1
+    assert pad_position in ['pre', 'post']
+
+    # Create tokenizer (limited to max_words)
+    tokenizer, max_words = create_tokenizer(texts, max_words_fraction)
+
+    # Tokenize the labels
+    sequences = tokenizer.texts_to_sequences(texts)
+
+    if pad:
+        if max_len is None:
+            max_len = max([len(x) for x in sequences])
+        sequences = pad_sequences(sequences, padding=pad_position, truncating=pad_position, maxlen=max_len)
+
+    return sequences, tokenizer, max_words, max_len
+
+
+def one_hot_encode_sequences(sequences, max_words):
+
+    # Create store for enconded labels
+    n_samples = sequences.shape[0]
+    x_features_encoded = np.zeros((n_samples, max_words), dtype=int)
+
+    # One hot encode
+    for i, j in enumerate(sequences):
+        if j is not None and j != []:
+            assert min(j) >= 0 and max(j) <= max_words
+            j_ar = np.array(j) - 1
+            x_features_encoded[i, j_ar] = 1
+        else:
+            print('No tokens available for sample ' + str(i))
 
     return x_features_encoded

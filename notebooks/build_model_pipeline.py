@@ -12,17 +12,16 @@ from utils import write_pickle, create_dir_if_nonexist, read_pickle
 from library.extract_training_datasets import get_training_data, create_source_label_vocabularly
 from library.model_configs import embedded_conv, basic_dense, basic_dense_plus
 
-
 print('Building predictive model')
 
 # Switches
-use_prepared_data = True
+use_prepared_data = False
 extract_training_data = False
 rebuild_source_vocabularly = False
 augment_training = False
 add_position_features = True
 add_isic_100_features = True
-x_feature_one_hot_encoding = False
+one_hot_encode = True
 
 # Settings
 augment_factor = 2
@@ -56,6 +55,7 @@ if use_prepared_data:
     y = prepared_data['y']
     tokenizer = prepared_data['tokenizer']
     max_words = prepared_data['max_words']
+    max_seq_len = prepared_data['sequence_max_len']
 
 else:
 
@@ -90,11 +90,11 @@ else:
     tokenizer, max_words = create_tokenizer(source_vocab, max_vocab_fraction)
 
     # Encode x labels
-    x_features_encoded = encode_x_labels(tokenizer, x_labels, max_words, one_hot_encoding=x_feature_one_hot_encoding)
+    x_encoded, max_seq_len = encode_x_labels(tokenizer, x_labels, max_words, one_hot_encoding=one_hot_encode)
 
     # Add label position feature
     if add_position_features:
-        x_features_encoded = np.hstack((x_features_encoded, training_data['position'].to_numpy().reshape(-1, 1)))
+        x_encoded = np.hstack((x_encoded, training_data['position'].to_numpy().reshape(-1, 1)))
 
     # C100 features
     if add_isic_100_features:
@@ -102,18 +102,18 @@ else:
 
         c100_labels = pd.read_excel(work_dir + 'hscpc/c100_labels.xlsx')['sector'].to_list()
         new_features = make_c100_features(training_data['source_row_label'].to_list(), c100_labels)
-        x_features_encoded = np.hstack((x_features_encoded, new_features))
+        x_encoded = np.hstack((x_encoded, new_features))
 
     # Augment
     if augment_training:
-        x_features_encoded, y = augment_by_adjacent_union(x_features_encoded, y, max_words, augment_factor)
+        x_encoded, y = augment_by_adjacent_union(x_encoded, y, max_words, augment_factor)
 
     # Final feature matrix
-    x = x_features_encoded.copy()
+    x = x_encoded.copy()
 
     # Save prepared dataset
-    prepared_data = {'x': x, 'y': y, 'tokenizer': tokenizer, 'max_words': max_words,
-                     'x_feature_one_hot_encoding': x_feature_one_hot_encoding}
+    prepared_data = {'x': x, 'y': y, 'tokenizer': tokenizer, 'max_words': max_words, 'sequence_max_len': max_seq_len,
+                     'x_feature_one_hot_encoding': one_hot_encode, 'n_feature_cols': x.shape[0]}
 
     write_pickle(fname_prepared_data, prepared_data)
 
@@ -127,15 +127,15 @@ print('Training set contains ' + str(n_features) + ' features and ' + str(x.shap
 x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_set_size)
 
 # Model
-model = basic_dense_plus(n_features, n_root)
-# model = basic_dense(n_features, n_root)
+# model = basic_dense_plus(n_features, n_root)
+model = basic_dense(n_features, n_root)
 opt = Adam(learning_rate=alpha)
 callback = EarlyStopping(monitor='acc', patience=4)
 model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['acc', 'categorical_accuracy',
                                                                        'mean_squared_error'])
 
-history = model.fit(x_train, y_train, epochs=n_epochs, batch_size=n_batch_size, validation_data=(x_test, y_test),
-                    callbacks=[callback])
+model.fit(x_train, y_train, epochs=n_epochs, batch_size=n_batch_size, validation_data=(x_test, y_test),
+          callbacks=[callback])
 
 preds = model.predict(x_test)
 preds[preds >= decision_boundary] = 1
@@ -159,7 +159,9 @@ sse = np.sum(np.square(preds - y))
 rmse = np.sqrt(np.mean(np.square(preds - y)))
 mae = np.mean(y - preds)
 
-print('Final score: accuracy: ' + "{:.4f}".format(acc) + ', SSD: ' + str(sse) + ', RMSE: ' + "{:.3f}".format(rmse) +
+print('Final score: accuracy: ' + "{:.4f}".format(acc) +
+      ', SSD: ' + str(sse) +
+      ', RMSE: ' + "{:.3f}".format(rmse) +
       ', MAE: ' + "{:.6f}".format(mae))
 
 # Save model object
@@ -171,14 +173,18 @@ write_pickle(model_fname, model)
 print('Saved model to disk. model_meta: ' + model_meta_name)
 
 # Save feature meta
-feature_meta = {'tokenizer': tokenizer, 'max_words': max_words, 'add_position_features': add_position_features,
+feature_meta = {'tokenizer': tokenizer,
+                'sequence_max_len': max_seq_len,
+                'max_words': max_words,
+                'add_position_features': add_position_features,
                 'add_isic_100_features': add_isic_100_features,
-                'x_feature_one_hot_encoding': x_feature_one_hot_encoding}
+                'x_feature_one_hot_encoding': one_hot_encode,
+                'x_col_dim': x.shape[0]}
 
 feature_meta_name = 'feature_meta_' + date_str_today + '_w' + str(max_words)
 fname_feature_meta = work_dir + 'model/' + feature_meta_name + '.pkl'
 write_pickle(fname_feature_meta, feature_meta)
 
-print('Saved feature meta to disk. feature_meta: ' + feature_meta_name)
+print('Saved feature meta to disk: ' + feature_meta_name)
 
 print('Finished model build')

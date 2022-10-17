@@ -1,10 +1,10 @@
-import pandas as pd
-import os
 import glob
+import os
 from pathlib import Path
 import numpy as np
-from utils import is_empty
+import pandas as pd
 from library.feature_engineering import clean_text_label, dictionary_supplement
+from utils import is_empty
 
 
 def extract_concordances_into_rows(training_data_path, save_path, n_root=6357):
@@ -109,7 +109,7 @@ def create_source_label_vocabularly(raw_data_dir, training_data_dir, n_root):
     # Constants
     empty_col_name = 'Unnamed: 0'
 
-    # use glob to get all the csv files in the folder
+    # Index all the csv files in the folder
     conc_files = glob.glob(os.path.join(raw_data_dir, "*.xlsx"))
     assert conc_files is not None and len(conc_files) > 0
 
@@ -180,7 +180,7 @@ def create_source_label_vocabularly(raw_data_dir, training_data_dir, n_root):
     print('Finished building vocabularly')
 
 
-def extract_train_concs_as_sequence(training_data_path, save_path, n_root=6357):
+def extract_concs_to_sequences(training_data_path, save_path, n_root=6357):
 
     print('Extracting training data from HSCPC concordances')
 
@@ -219,12 +219,11 @@ def extract_train_concs_as_sequence(training_data_path, save_path, n_root=6357):
             conc = df.set_index('labels')
 
             # Convert to array
-            assert not conc.isnull().values.any()
             conc_ar = conc.to_numpy(dtype=int, copy=True)  # what do NaNs get converted as?
 
+            assert not conc.isnull().values.any()
             assert conc_ar.shape[0] == n_source and conc_ar.shape[1] == n_root
 
-            tmp_store = []
             hscpc_seq = ''
             src_lbl_seq = ''
 
@@ -246,17 +245,21 @@ def extract_train_concs_as_sequence(training_data_path, save_path, n_root=6357):
                     hscpc_labels = nnzs
 
                     # Make sequences
-                    hscpc_seq = hscpc_seq + ' ZZZZ ' + ' '.join([str(x) for x in hscpc_labels])
-                    src_lbl_seq = src_lbl_seq + ' ZZZZ ' + row_label
+                    hscpc_seq = hscpc_seq + ' '.join([str(x) for x in hscpc_labels]) + ' ZZZZ '
+                    src_lbl_seq = src_lbl_seq + row_label + ' ZZZZ '
 
-            # Store
-            tmp_store.append({'conc': fname, 'source_label_sequence': src_lbl_seq, 'hscpc_sequence': hscpc_seq})
-            feature_store.extend(tmp_store)
+                    # Write to store
+                    conc_name = fname.replace('.xlsx', '')
+                    feature_store.append({'conc': conc_name,
+                                          'address': str(i) + '/' + str(n_source-1),
+                                          'source_label_sequence': src_lbl_seq,
+                                          'hscpc_sequence': hscpc_seq})
 
     print('Feature store contains: ' + str(len(feature_store)))
 
     fname = save_path + 'sequence_training_set.pkl'
     feature_fd = pd.DataFrame(feature_store)
     feature_fd.to_pickle(fname)
+    feature_fd.to_excel(fname.replace('pkl', 'xlsx'))
 
-    print('Finished extracting concordances')
+    return feature_fd

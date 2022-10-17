@@ -8,8 +8,8 @@ from library.make_estimated_conc import (maximum_match_probability, conc_flood_f
                                          conc_flood_fill_max_prob)
 
 # Settings
-model_version = 'model_2022-09-25_w3126_s4521_l4'
-feature_meta_version = 'feature_meta_2022-09-25_w3126'
+model_version = 'model_2022-10-16_w3137_s4702_l4'
+feature_meta_version = 'feature_meta_2022-10-16_w3137'
 target_label_file = 'USA_BEA_15_labels'
 decision_boundary = 0.85
 
@@ -50,10 +50,11 @@ feature_meta_fname = work_dir + 'model/' + feature_meta_version + '.pkl'
 feature_meta = read_pickle(feature_meta_fname)
 
 # One-hot-encode x labels
-x_features_encoded = encode_x_labels(feature_meta['tokenizer'],
-                                     x_labels,
-                                     feature_meta['max_words'],
-                                     one_hot_encoding=feature_meta['x_feature_one_hot_encoding'])
+x_features_encoded, _ = encode_x_labels(feature_meta['tokenizer'],
+                                        x_labels,
+                                        feature_meta['max_words'],
+                                        one_hot_encoding=feature_meta['x_feature_one_hot_encoding'],
+                                        max_len=feature_meta['sequence_max_len'])
 
 # Add label position feature
 if feature_meta['add_position_features']:
@@ -82,6 +83,8 @@ fname_prefix = prediction_dir + 'challenger_deep_predict_' + source_name
 # Save raw estimates
 conc_raw_estimates = pd.DataFrame(preds, index=x_labels, columns=target_labels)
 conc_raw_estimates.to_excel(fname_prefix + '_raw' + '.xlsx')
+
+print('Raw mean-max certainty: ' + str(np.mean(conc_raw_estimates.max(axis=1).values)))
 
 # Save estimates, filtered by decision boundary
 conc_filtered = conc_from_decision_boundary(conc_raw_estimates.copy(), decision_boundary=decision_boundary)
