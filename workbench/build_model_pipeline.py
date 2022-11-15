@@ -21,7 +21,7 @@ rebuild_source_vocabularly = False
 augment_training = False
 add_position_features = True
 add_isic_100_features = True
-one_hot_encode = True
+one_hot_encode = False
 
 # Settings
 augment_factor = 2
