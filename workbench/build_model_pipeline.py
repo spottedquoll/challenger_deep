@@ -1,18 +1,20 @@
-from keras.optimizers import Adam, SGD
-from keras.callbacks import EarlyStopping
-import pandas as pd
-import numpy as np
 import os
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
-from library.feature_engineering import encode_x_labels, create_tokenizer, make_c100_features
-from library.augmentation import augment_by_adjacent_union
 from datetime import date
-from utils import write_pickle, create_dir_if_nonexist, read_pickle
-from library.extract_training_datasets import get_training_data, create_source_label_vocabularly
-from library.model_configs import embedded_conv, basic_dense, basic_dense_plus
 
-print('Building predictive model')
+import numpy as np
+import pandas as pd
+from keras.callbacks import EarlyStopping
+from keras.optimizers import Adam
+from sklearn.metrics import accuracy_score, log_loss
+from sklearn.model_selection import train_test_split
+
+from library.augmentation import augment_by_adjacent_union
+from library.extract_training_datasets import get_training_data, create_source_label_vocabularly
+from library.feature_engineering import encode_x_labels, create_tokenizer, make_c100_features
+from library.model_configs import basic_dense, basic_dense_plus
+from utils import write_pickle, create_dir_if_nonexist, read_pickle
+
+print('Building predictive model...')
 
 # Switches
 use_prepared_data = False
@@ -21,16 +23,16 @@ rebuild_source_vocabularly = False
 augment_training = False
 add_position_features = True
 add_isic_100_features = True
-one_hot_encode = False
+one_hot_encode = True
 
 # Settings
 augment_factor = 2
 test_set_size = 0.1
 max_vocab_fraction = 0.99
 decision_boundary = 0.90
-n_epochs = 50
+n_epochs = 150
 n_batch_size = 100
-alpha = 0.00000001  # learning rate
+alpha = 0.000001  # learning rate
 
 # Constants
 n_root = 6357
@@ -94,10 +96,13 @@ else:
 
     # Add label position feature
     if add_position_features:
-        x_encoded = np.hstack((x_encoded, training_data['position'].to_numpy().reshape(-1, 1)))
+        x_encoded = np.hstack((x_encoded,
+                               training_data['position'].to_numpy().reshape(-1, 1))
+                              )
 
     # C100 features
     if add_isic_100_features:
+
         print('Calculating string similarity between x labels and C100...')
 
         c100_labels = pd.read_excel(work_dir + 'hscpc/c100_labels.xlsx')['sector'].to_list()
@@ -112,8 +117,14 @@ else:
     x = x_encoded.copy()
 
     # Save prepared dataset
-    prepared_data = {'x': x, 'y': y, 'tokenizer': tokenizer, 'max_words': max_words, 'sequence_max_len': max_seq_len,
-                     'x_feature_one_hot_encoding': one_hot_encode, 'n_feature_cols': x.shape[0]}
+    prepared_data = {'x': x,
+                     'y': y,
+                     'tokenizer': tokenizer,
+                     'max_words': max_words,
+                     'sequence_max_len': max_seq_len,
+                     'x_feature_one_hot_encoding': one_hot_encode,
+                     'n_feature_cols': x.shape[0]
+                     }
 
     write_pickle(fname_prepared_data, prepared_data)
 
@@ -127,17 +138,20 @@ print('Training set contains ' + str(n_features) + ' features and ' + str(x.shap
 x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_set_size)
 
 # Model
-# model = basic_dense_plus(n_features, n_root)
+#model = basic_dense_plus(n_features, n_root)
 model = basic_dense(n_features, n_root)
 opt = Adam(learning_rate=alpha)
-callback = EarlyStopping(monitor='acc', patience=4)
-model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['acc', 'categorical_accuracy',
-                                                                       'mean_squared_error'])
+callback = EarlyStopping(monitor='acc', patience=6)
+model.compile(optimizer=opt,
+              loss='categorical_crossentropy',
+              metrics=['acc', 'categorical_accuracy', 'binary_accuracy'])
 
 model.fit(x_train, y_train, epochs=n_epochs, batch_size=n_batch_size, validation_data=(x_test, y_test),
           callbacks=[callback])
 
 preds = model.predict(x_test)
+
+dbs = [0.85, 0.9, 0.95]
 preds[preds >= decision_boundary] = 1
 preds[preds < decision_boundary] = 0
 
@@ -155,14 +169,18 @@ preds[preds >= decision_boundary] = 1
 preds[preds < decision_boundary] = 0
 
 acc = accuracy_score(y, preds)
+log_loss = log_loss(y, preds)
 sse = np.sum(np.square(preds - y))
 rmse = np.sqrt(np.mean(np.square(preds - y)))
 mae = np.mean(y - preds)
 
-print('Final score: accuracy: ' + "{:.4f}".format(acc) +
+print('Final score:' +
+      ' accuracy: ' + "{:.4f}".format(acc) +
       ', SSD: ' + str(sse) +
       ', RMSE: ' + "{:.3f}".format(rmse) +
-      ', MAE: ' + "{:.6f}".format(mae))
+      ', MAE: ' + "{:.6f}".format(mae) +
+      ', x-entropy: ' + "{:.4f}".format(log_loss)
+      )
 
 # Save model object
 n_layers = len(model.layers)

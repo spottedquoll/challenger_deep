@@ -8,9 +8,9 @@ from library.make_estimated_conc import (maximum_match_probability, conc_flood_f
                                          conc_flood_fill_max_prob)
 
 # Settings
-model_version = 'model_2022-11-13_w3137_s4702_l4'
-feature_meta_version = 'feature_meta_2022-11-13_w3137'
-target_label_file = 'ILO_INJ_FATL_ECO_NB_A_EN_22_labels'
+model_version = 'model_2023-02-13_w5740_s10488_l4'
+feature_meta_version = 'feature_meta_2023-02-13_w5740'
+target_label_file = 'gloria_120_labels'
 decision_boundary = 0.85
 
 print('Predicting ' + target_label_file + ' HSCPC matches')

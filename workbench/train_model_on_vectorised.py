@@ -27,10 +27,14 @@ else:
 
 # Texts-to-sequences
 input_text = feature_fd['source_label_sequence'].to_list()
-in_seq, in_tokenizer, in_max_words, in_max_len = encode_text_sequences(input_text, max_words_fraction=0.95, pad_position='pre')
+in_seq, in_tokenizer, in_max_words, in_max_len = encode_text_sequences(input_text,
+                                                                       max_words_fraction=0.95,
+                                                                       pad_position='pre')
 
 output_text = feature_fd['hscpc_sequence'].to_list()
-out_seq, out_tokenizer, out_max_words, out_max_len = encode_text_sequences(output_text, max_words_fraction=1.0, pad_position='post')
+out_seq, out_tokenizer, out_max_words, out_max_len = encode_text_sequences(output_text,
+                                                                           max_words_fraction=1.0,
+                                                                           pad_position='post')
 
 n_samples = feature_fd.shape[0]
 del feature_fd

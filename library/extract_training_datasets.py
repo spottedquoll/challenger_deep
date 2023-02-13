@@ -73,7 +73,12 @@ def extract_concordances_into_rows(training_data_path, save_path, n_root=6357):
                     position = (i+1)/conc_ar.shape[0]
 
                     # Store
-                    tmp_store.append({'conc': fname, 'source_row_label': row_label, 'hscpc_labels': hscpc_labels, 'position': position})
+                    tmp_store.append({'conc': fname,
+                                      'source_row_label': row_label,
+                                      'hscpc_labels': hscpc_labels,
+                                      'position': position,
+                                      'matches': len(nnzs)
+                                      })
 
             feature_store.extend(tmp_store)
 
@@ -98,13 +103,14 @@ def get_training_data(raw_data_dir, training_data_dir, extract_training_data=Tru
     return training_data
 
 
-def create_source_label_vocabularly(raw_data_dir, training_data_dir, n_root):
+def create_source_label_vocabularly(raw_data_dir, training_data_dir, n_root, remove_punctuation=True,
+                                    split_labels_by_whitespace=True, remove_stop_words=True):
 
     print('Creating source label vocab')
 
     # Switches
-    remove_punctuation = True
-    split_labels_by_whitespace = True
+
+
 
     # Constants
     empty_col_name = 'Unnamed: 0'
@@ -170,7 +176,13 @@ def create_source_label_vocabularly(raw_data_dir, training_data_dir, n_root):
     print('Removed ' + str(len_prior - len_new) + ' duplicate entries; ' + str(len_new) + ' entries remain')
 
     # Delete unuseful words
-    words = ['and', 'or']
+    if remove_stop_words:
+
+        stop_words = ['and', 'or', 'of']
+
+        for word in dictionary:
+            if word in stop_words:
+                dictionary.remove(word)
 
     # Save
     fname = training_data_dir + 'label_dictionary.pkl'
@@ -193,11 +205,11 @@ def extract_concs_to_sequences(training_data_path, save_path, n_root=6357):
     feature_store = []
 
     # loop over the list of csv files
-    for f in conc_files:
+    for i, f in enumerate(conc_files):
 
         fname = Path(f).name
 
-        print('... ' + fname)
+        print('... ' + fname + ' (' + str(i) + str(len(conc_files)) + ')')
 
         if '.xlsx' in fname and '~$' not in fname:
 
@@ -221,8 +233,10 @@ def extract_concs_to_sequences(training_data_path, save_path, n_root=6357):
             # Convert to array
             conc_ar = conc.to_numpy(dtype=int, copy=True)  # what do NaNs get converted as?
 
+            # Tests
             assert not conc.isnull().values.any()
-            assert conc_ar.shape[0] == n_source and conc_ar.shape[1] == n_root
+            assert conc_ar.shape[0] == n_source
+            assert conc_ar.shape[1] == n_root
 
             hscpc_seq = ''
             src_lbl_seq = ''

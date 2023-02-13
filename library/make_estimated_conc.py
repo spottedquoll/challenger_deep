@@ -202,14 +202,13 @@ def conc_from_clusters(conc_estimated, threshold=0.92):
 
 def conc_from_decision_boundary(conc_estimated, decision_boundary=0.95):
 
-    # est = preds.copy()
     conc_estimated[conc_estimated >= decision_boundary] = 1
     conc_estimated[conc_estimated < decision_boundary] = 0
 
     return conc_estimated
 
 
-def conc_flood_fill_max_prob(conc_estimated, threshold=0.95):
+def conc_flood_fill_max_prob(conc_estimated):
     """
         Flood fills from center of mass
     """
@@ -234,8 +233,9 @@ def conc_flood_fill_max_prob(conc_estimated, threshold=0.95):
             prob = probs_sorted[k]
             c_top_prob = conc_est_tr.loc[(conc_est_tr[c] >= prob) & (conc_est_tr[c] < previous_prob)][[c, 'index_int']]
 
-            if c_top_prob is None or len(c_top_prob) == 0:
-                stop = 1
+            if c_top_prob.shape[0] == 0:
+                if prob == previous_prob:
+                    c_top_prob = conc_est_tr.loc[(conc_est_tr[c] >= prob)]
 
             j = c_top_prob['index_int'].values[0]
             if sum(conc_ar[:, j]) == 0:

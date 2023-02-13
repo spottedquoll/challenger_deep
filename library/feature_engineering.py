@@ -60,7 +60,7 @@ def clean_text_label(txt):
 def dictionary_supplement():
 
     d = ['millwork', 'breweries', 'brewery', 'wineries', 'distilleries', 'retailers', 'owner', 'occupied', 'housing',
-         'cocoyams', 'tenant', 'fisher']
+         'cocoyams', 'tenant', 'fisher', 'prints', 'cropping']
 
     return d
 
@@ -115,7 +115,6 @@ def encode_x_labels(tokenizer, x_labels, max_words, one_hot_encoding=True, max_l
 def encode_text_sequences(texts, max_words_fraction=0.95, pad=True, pad_position='post', max_len=None):
 
     # Tests
-    # assert texts is list_like
     assert 0 < max_words_fraction <= 1
     assert pad_position in ['pre', 'post']
 
