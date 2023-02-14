@@ -5,7 +5,8 @@ import pandas as pd
 from library.feature_engineering import encode_x_labels, clean_text_label, create_position_feature, make_c100_features
 from utils import duplicates_in_list, create_dir_if_nonexist
 from library.make_estimated_conc import (maximum_match_probability, conc_flood_fill_com, conc_from_decision_boundary,
-                                         conc_flood_fill_max_prob)
+                                         conc_flood_fill_max_prob, conc_decision_boundary_voting_ensemble,
+                                         conc_flood_fill_max_prob_root_category)
 
 # Settings
 model_version = 'model_2023-02-13_w5740_s10488_l4'
@@ -101,5 +102,12 @@ conc_max_prob.to_excel(fname_prefix + '_conc_max_prob' + '.xlsx')
 # Center of mass
 conc_com = conc_flood_fill_max_prob(conc_raw_estimates.copy())
 conc_com.to_excel(fname_prefix + '_conc_flood_fill_max_prob' + '.xlsx')
+
+conc_com = conc_flood_fill_max_prob_root_category(conc_raw_estimates.copy())
+conc_com.to_excel(fname_prefix + '_conc_flood_fill_max_prob_root_categories' + '.xlsx')
+
+# Voting ensemble
+conc = conc_decision_boundary_voting_ensemble(conc_raw_estimates.copy())
+conc.to_excel(fname_prefix + '_conc_voting_ensemble' + '.xlsx')
 
 print('Finished writing predictons to ' + prediction_dir)

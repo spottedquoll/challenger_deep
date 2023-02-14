@@ -30,7 +30,7 @@ augment_factor = 2
 test_set_size = 0.1
 max_vocab_fraction = 0.99
 decision_boundary = 0.90
-n_epochs = 150
+n_epochs = 200
 n_batch_size = 100
 alpha = 0.000001  # learning rate
 
@@ -152,14 +152,17 @@ model.fit(x_train, y_train, epochs=n_epochs, batch_size=n_batch_size, validation
 preds = model.predict(x_test)
 
 dbs = [0.85, 0.9, 0.95]
-preds[preds >= decision_boundary] = 1
-preds[preds < decision_boundary] = 0
+for d in dbs:
 
-acc = accuracy_score(y_test, preds)
-sse = np.sum(np.square(preds - y_test))
-rmse = np.sqrt(np.mean(np.square(preds - y_test)))
+    preds[preds >= decision_boundary] = 1
+    preds[preds < decision_boundary] = 0
 
-print('Accuracy: ' + "{:.4f}".format(acc) + ', SSE: ' + str(sse) + ', RMSE: ' + "{:.3f}".format(rmse))
+    acc = accuracy_score(y_test, preds)
+    sse = np.sum(np.square(preds - y_test))
+    rmse = np.sqrt(np.mean(np.square(preds - y_test)))
+
+    print('DecBou: ' + str(d) + ', accuracy: ' + "{:.4f}".format(acc) + ', SSE: ' + str(sse) +
+          ', RMSE: ' + "{:.3f}".format(rmse))
 
 # Retrain model with full training set
 model.fit(x, y, epochs=n_epochs, batch_size=n_batch_size, validation_data=(x, y), callbacks=[callback])
