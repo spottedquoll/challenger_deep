@@ -8,9 +8,9 @@ from library.make_estimated_conc import (maximum_match_probability, conc_flood_f
                                          conc_flood_fill_max_prob)
 
 # Settings
-model_version = 'model_2022-09-25_w3126_s4521_l4'
-feature_meta_version = 'feature_meta_2022-09-25_w3126'
-target_label_file = 'USA_BEA_15_labels'
+model_version = 'model_2024-10-10_w3113_s4114_l4'
+feature_meta_version = 'feature_meta_2024-10-10_w3113'
+target_label_file = 'japan-ielab-4266'
 decision_boundary = 0.85
 
 print('Predicting ' + target_label_file + ' HSCPC matches')
@@ -19,7 +19,7 @@ print('Predicting ' + target_label_file + ' HSCPC matches')
 n_root = 6357
 
 # Paths
-work_dir = os.environ['work_dir'] + '/'
+work_dir = os.environ['WORK_DIR'] + '/'
 model_dir = work_dir + 'model/'
 label_dir = work_dir + 'input_labels/'
 
@@ -37,13 +37,23 @@ for i, r in enumerate(source_labels):
 
 print('Extracted ' + str(len(x_labels)) + ' source labels')
 
+if duplicates_in_list(x_labels):
+
+    new_lables = []
+    for i, v in enumerate(x_labels):
+        totalcount = x_labels.count(v)
+        count = x_labels[:i].count(v)
+        new_lables.append(v + '-' + chr(ord('`') + count + 1) if totalcount > 1 else v)
+
+    x_labels = new_lables
+
 assert not duplicates_in_list(x_labels)
 
 # Load HSCPC labels
 df = pd.read_excel(work_dir + 'hscpc/hscpc_labels.xlsx', header=0)
 target_labels = df['Labels'].values
 
-assert not duplicates_in_list(x_labels)
+assert not duplicates_in_list(target_labels)
 
 # Load feature meta
 feature_meta_fname = work_dir + 'model/' + feature_meta_version + '.pkl'
@@ -79,13 +89,13 @@ print('Saving concordance predictions')
 source_name = target_label_file.replace('_labels', '')
 fname_prefix = prediction_dir + 'challenger_deep_predict_' + source_name
 
-# Save raw estimates
+# # Save raw estimates
 conc_raw_estimates = pd.DataFrame(preds, index=x_labels, columns=target_labels)
-conc_raw_estimates.to_excel(fname_prefix + '_raw' + '.xlsx')
+# conc_raw_estimates.to_excel(fname_prefix + '_raw' + '.xlsx')
 
-# Save estimates, filtered by decision boundary
-conc_filtered = conc_from_decision_boundary(conc_raw_estimates.copy(), decision_boundary=decision_boundary)
-conc_filtered.to_excel(fname_prefix + '_conc_thresholded_' + str(decision_boundary) + '.xlsx')
+# # Save estimates, filtered by decision boundary
+# conc_filtered = conc_from_decision_boundary(conc_raw_estimates.copy(), decision_boundary=decision_boundary)
+# conc_filtered.to_excel(fname_prefix + '_conc_thresholded_' + str(decision_boundary) + '.xlsx')
 
 # Center of mass
 conc_com = conc_flood_fill_com(conc_raw_estimates.copy())

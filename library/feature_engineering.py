@@ -1,6 +1,6 @@
 import string
 import numpy as np
-from keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.text import Tokenizer
 from keras.utils import pad_sequences
 from fuzzywuzzy import fuzz
 
@@ -60,7 +60,7 @@ def clean_text_label(txt):
 def dictionary_supplement():
 
     d = ['millwork', 'breweries', 'brewery', 'wineries', 'distilleries', 'retailers', 'owner', 'occupied', 'housing',
-         'cocoyams', 'tenant', 'fisher']
+         'cocoyams', 'tenant', 'fisher', 'cinema', 'theatre', 'playground', 'arcade', 'barber', 'pachinko', 'cremation']
 
     return d
 

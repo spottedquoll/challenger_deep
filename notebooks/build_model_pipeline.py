@@ -17,8 +17,8 @@ print('Building predictive model')
 
 # Switches
 use_prepared_data = False
-extract_training_data = False
-rebuild_source_vocabularly = False
+extract_training_data = True
+rebuild_source_vocabularly = True
 augment_training = False
 add_position_features = True
 add_isic_100_features = True
@@ -39,7 +39,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 date_str_today = date.today().strftime("%Y-%m-%d")
 
 # Paths
-work_dir = os.environ['work_dir']
+work_dir = os.environ['WORK_DIR'] + '/'
 raw_data_dir = work_dir + 'training_concs_hscpc/'
 
 training_data_dir = work_dir + 'training_data/'
@@ -56,7 +56,7 @@ if use_prepared_data:
     y = prepared_data['y']
     tokenizer = prepared_data['tokenizer']
     max_words = prepared_data['max_words']
-    sequences = prepared_data['sequences']
+    #sequences = prepared_data['sequences']
 
 else:
 
@@ -114,9 +114,9 @@ else:
     x = x_features_encoded.copy()
 
     # Save prepared dataset
-    prepared_data = {'x': x, 'y': y, 'tokenizer': tokenizer, 'max_words': max_words, 'sequences': sequences,
+    prepared_data = {'x': x, 'y': y, 'tokenizer': tokenizer, 'max_words': max_words,
                      'x_feature_one_hot_encoding': x_feature_one_hot_encoding}
-
+    # , 'sequences': sequences
     write_pickle(fname_prepared_data, prepared_data)
 
 # Training set properties
@@ -172,8 +172,8 @@ print('Saved model to disk. model_meta: ' + model_meta_name)
 
 # Save feature meta
 feature_meta = {'tokenizer': tokenizer, 'max_words': max_words, 'add_position_features': add_position_features,
-                'sequences': sequences, 'add_isic_100_features': add_isic_100_features,
-                'x_feature_one_hot_encoding': x_feature_one_hot_encoding}
+                'add_isic_100_features': add_isic_100_features,
+                'x_feature_one_hot_encoding': x_feature_one_hot_encoding}  # 'sequences': sequences
 
 feature_meta_name = 'feature_meta_' + date_str_today + '_w' + str(max_words)
 fname_feature_meta = work_dir + 'model/' + feature_meta_name + '.pkl'

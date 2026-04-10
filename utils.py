@@ -58,7 +58,7 @@ def is_empty(obj):
 
     if obj is None:
         return True
-    elif isinstance(obj, np.float):
+    elif isinstance(obj, float):
         return False
     elif isinstance(obj, pd.DataFrame):
         if obj.empty:
